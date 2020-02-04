@@ -2,6 +2,7 @@
 #include "CMainApplication.h"
 #include "DX12RenderModel.h"
 #include "SDLApplication.h"
+#include "dprintf.h"
 #include <D3Dcompiler.h>
 #include <stdio.h>
 #include <string>
@@ -30,69 +31,15 @@ void ThreadSleep(unsigned long nMilliseconds)
 	::Sleep(nMilliseconds);
 }
 
-static bool g_bPrintf = true;
-
-//-----------------------------------------------------------------------------
-// Purpose: Outputs a set of optional arguments to debugging output, using
-//          the printf format setting specified in fmt*.
-//-----------------------------------------------------------------------------
-void dprintf(const char *fmt, ...)
-{
-	va_list args;
-	char buffer[2048];
-
-	va_start(args, fmt);
-	vsprintf_s(buffer, fmt, args);
-	va_end(args);
-
-	if (g_bPrintf)
-		printf("%s", buffer);
-
-	OutputDebugStringA(buffer);
-}
-
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
-CMainApplication::CMainApplication(int argc, char *argv[])
-	: m_sdl(new SDLApplication), m_pHMD(NULL), m_pRenderModels(NULL), m_bDebugD3D12(false), m_bVerbose(false), m_bPerf(false), m_bVblank(false), m_nMSAASampleCount(4), m_flSuperSampleScale(1.0f), m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1), m_iSceneVolumeInit(20), m_strPoseClasses(""), m_bShowCubes(true), m_nFrameIndex(0), m_fenceEvent(NULL), m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
+CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
+	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale), m_sdl(new SDLApplication),
+	  m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1), m_strPoseClasses(""), m_bShowCubes(true), m_nFrameIndex(0), m_fenceEvent(NULL), m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
 {
 	memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
 
-	for (int i = 1; i < argc; i++)
-	{
-		if (!stricmp(argv[i], "-dxdebug"))
-		{
-			m_bDebugD3D12 = true;
-		}
-		else if (!stricmp(argv[i], "-verbose"))
-		{
-			m_bVerbose = true;
-		}
-		else if (!stricmp(argv[i], "-novblank"))
-		{
-			m_bVblank = false;
-		}
-		else if (!stricmp(argv[i], "-msaa") && (argc > i + 1) && (*argv[i + 1] != '-'))
-		{
-			m_nMSAASampleCount = atoi(argv[i + 1]);
-			i++;
-		}
-		else if (!stricmp(argv[i], "-supersample") && (argc > i + 1) && (*argv[i + 1] != '-'))
-		{
-			m_flSuperSampleScale = (float)atof(argv[i + 1]);
-			i++;
-		}
-		else if (!stricmp(argv[i], "-noprintf"))
-		{
-			g_bPrintf = false;
-		}
-		else if (!stricmp(argv[i], "-cubevolume") && (argc > i + 1) && (*argv[i + 1] != '-'))
-		{
-			m_iSceneVolumeInit = atoi(argv[i + 1]);
-			i++;
-		}
-	}
 	// other initialization tasks are done in BInit
 	memset(m_rDevClassChar, 0, sizeof(m_rDevClassChar));
 };
@@ -138,7 +85,7 @@ std::string GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-bool CMainApplication::BInit()
+bool CMainApplication::BInit(bool bDebugD3D12, int iSceneVolumeInit)
 {
 	// Loading the SteamVR Runtime
 	vr::EVRInitError eError = vr::VRInitError_None;
@@ -175,9 +122,9 @@ bool CMainApplication::BInit()
 	}
 
 	// cube array
-	m_iSceneVolumeWidth = m_iSceneVolumeInit;
-	m_iSceneVolumeHeight = m_iSceneVolumeInit;
-	m_iSceneVolumeDepth = m_iSceneVolumeInit;
+	m_iSceneVolumeWidth = iSceneVolumeInit;
+	m_iSceneVolumeHeight = iSceneVolumeInit;
+	m_iSceneVolumeDepth = iSceneVolumeInit;
 
 	m_fScale = 0.3f;
 	m_fScaleSpacing = 4.0f;
@@ -187,7 +134,7 @@ bool CMainApplication::BInit()
 
 	m_uiVertcount = 0;
 
-	if (!BInitD3D12())
+	if (!BInitD3D12(bDebugD3D12))
 	{
 		dprintf("%s - Unable to initialize D3D12!\n", __FUNCTION__);
 		return false;
@@ -208,12 +155,12 @@ bool CMainApplication::BInit()
 //          If failure occurred in a module other than shaders, the function
 //          may return true or throw an error.
 //-----------------------------------------------------------------------------
-bool CMainApplication::BInitD3D12()
+bool CMainApplication::BInitD3D12(bool bDebugD3D12)
 {
 	UINT nDXGIFactoryFlags = 0;
 
 	// Debug layers if -dxdebug is specified
-	if (m_bDebugD3D12)
+	if (bDebugD3D12)
 	{
 		ComPtr<ID3D12Debug> pDebugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pDebugController))))

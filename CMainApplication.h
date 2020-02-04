@@ -38,15 +38,14 @@ enum CBVSRVIndex_t
 class CMainApplication
 {
 public:
-    CMainApplication(int argc, char *argv[]);
+    CMainApplication(int msaa, float flSuperSampleScale);
     virtual ~CMainApplication();
 
-    bool BInit();
-    bool BInitD3D12();
+    bool BInit(bool bDebugD3D12, int iSceneVolumeInit);
+    bool BInitD3D12(bool bDebugD3D12);
     bool BInitCompositor();
 
     void SetupRenderModels();
-
 
     void RunMainLoop();
     bool HandleInput();
@@ -83,16 +82,10 @@ public:
     class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName);
 
 private:
-    bool m_bDebugD3D12;
-    bool m_bVerbose;
-    bool m_bPerf;
-    bool m_bVblank;
+    vr::IVRSystem *m_pHMD = nullptr;
+    vr::IVRRenderModels *m_pRenderModels = nullptr;
     int m_nMSAASampleCount;
-    // Optional scaling factor to render with supersampling (defaults off, use -scale)
     float m_flSuperSampleScale;
-
-    vr::IVRSystem *m_pHMD;
-    vr::IVRRenderModels *m_pRenderModels;
     std::string m_strDriver;
     std::string m_strDisplay;
     vr::TrackedDevicePose_t m_rTrackedDevicePose[vr::k_unMaxTrackedDeviceCount];
@@ -118,7 +111,6 @@ private:
     float m_fScaleSpacing;
     float m_fScale;
 
-    int m_iSceneVolumeInit; // if you want something other than the default 20x20x20
 
     float m_fNearClip;
     float m_fFarClip;

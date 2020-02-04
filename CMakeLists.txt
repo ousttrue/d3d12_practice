@@ -5,6 +5,8 @@ add_executable(${PROJECT_NAME}
     CMainApplication.cpp
     DX12RenderModel.cpp
     SDLApplication.cpp
+    Commandline.cpp
+    dprintf.cpp
     main.cpp
     lodepng.cpp
     Matrices.cpp

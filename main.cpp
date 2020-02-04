@@ -1,10 +1,13 @@
 #include "CMainApplication.h"
+#include "Commandline.h"
 
 int main(int argc, char *argv[])
 {
-    CMainApplication pMainApplication(argc, argv);
+    Commandline cmdline(argc, argv);
 
-    if (!pMainApplication.BInit())
+    CMainApplication pMainApplication(cmdline.m_nMSAASampleCount, cmdline.m_flSuperSampleScale);
+
+    if (!pMainApplication.BInit(cmdline.m_bDebugD3D12, cmdline.m_iSceneVolumeInit))
     {
         return 1;
     }
