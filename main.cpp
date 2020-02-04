@@ -2,19 +2,14 @@
 
 int main(int argc, char *argv[])
 {
-    CMainApplication *pMainApplication = new CMainApplication(argc, argv);
+    CMainApplication pMainApplication(argc, argv);
 
-    if (!pMainApplication->BInit())
+    if (!pMainApplication.BInit())
     {
-        pMainApplication->Shutdown();
         return 1;
     }
 
-    pMainApplication->RunMainLoop();
-
-    pMainApplication->Shutdown();
-
-    delete pMainApplication;
+    pMainApplication.RunMainLoop();
 
     return 0;
 }

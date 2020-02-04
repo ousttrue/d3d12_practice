@@ -107,6 +107,7 @@ CMainApplication::CMainApplication(int argc, char *argv[])
 //-----------------------------------------------------------------------------
 CMainApplication::~CMainApplication()
 {
+	Shutdown();
 	// work is done in Shutdown
 	dprintf("Shutdown");
 }
