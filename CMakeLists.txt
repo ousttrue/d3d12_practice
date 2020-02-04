@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0.0)
 project(hello12)
 
 add_executable(${PROJECT_NAME}
+    CMainApplication.cpp
     main.cpp
     lodepng.cpp
     Matrices.cpp

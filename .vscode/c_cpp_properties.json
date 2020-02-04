@@ -3,9 +3,9 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
                 "${env:VCPKG_DIR}/installed/x64-windows/include",
-                "${env:VCPKG_DIR}/installed/x64-windows/include/SDL2",
+                "${env:VCPKG_DIR}/installed/x64-windows/include/SDL2"
             ],
             "defines": [
                 "_DEBUG",
