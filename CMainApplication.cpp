@@ -1,8 +1,8 @@
 //========= Copyright Valve Corporation ============//
 #include "CMainApplication.h"
 #include "DX12RenderModel.h"
+#include "SDLApplication.h"
 #include <D3Dcompiler.h>
-#include <SDL_syswm.h>
 #include <stdio.h>
 #include <string>
 #include <cstdlib>
@@ -30,12 +30,7 @@ void ThreadSleep(unsigned long nMilliseconds)
 	::Sleep(nMilliseconds);
 }
 
-
-
-
-
 static bool g_bPrintf = true;
-// static const int g_nFrameCount = 2; // Swapchain depth
 
 //-----------------------------------------------------------------------------
 // Purpose: Outputs a set of optional arguments to debugging output, using
@@ -60,7 +55,7 @@ void dprintf(const char *fmt, ...)
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
 CMainApplication::CMainApplication(int argc, char *argv[])
-	: m_pCompanionWindow(NULL), m_nCompanionWindowWidth(640), m_nCompanionWindowHeight(320), m_pHMD(NULL), m_pRenderModels(NULL), m_bDebugD3D12(false), m_bVerbose(false), m_bPerf(false), m_bVblank(false), m_nMSAASampleCount(4), m_flSuperSampleScale(1.0f), m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1), m_iSceneVolumeInit(20), m_strPoseClasses(""), m_bShowCubes(true), m_nFrameIndex(0), m_fenceEvent(NULL), m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
+	: m_sdl(new SDLApplication), m_pHMD(NULL), m_pRenderModels(NULL), m_bDebugD3D12(false), m_bVerbose(false), m_bPerf(false), m_bVblank(false), m_nMSAASampleCount(4), m_flSuperSampleScale(1.0f), m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1), m_iSceneVolumeInit(20), m_strPoseClasses(""), m_bShowCubes(true), m_nFrameIndex(0), m_fenceEvent(NULL), m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
 {
 	memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
 
@@ -107,7 +102,18 @@ CMainApplication::CMainApplication(int argc, char *argv[])
 //-----------------------------------------------------------------------------
 CMainApplication::~CMainApplication()
 {
-	Shutdown();
+	if (m_pHMD)
+	{
+		vr::VR_Shutdown();
+		m_pHMD = NULL;
+	}
+
+	for (std::vector<DX12RenderModel *>::iterator i = m_vecRenderModels.begin(); i != m_vecRenderModels.end(); i++)
+	{
+		delete (*i);
+	}
+	m_vecRenderModels.clear();
+	delete m_sdl;
 	// work is done in Shutdown
 	dprintf("Shutdown");
 }
@@ -134,12 +140,6 @@ std::string GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t
 //-----------------------------------------------------------------------------
 bool CMainApplication::BInit()
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0)
-	{
-		dprintf("%s - SDL could not initialize! SDL Error: %s\n", __FUNCTION__, SDL_GetError());
-		return false;
-	}
-
 	// Loading the SteamVR Runtime
 	vr::EVRInitError eError = vr::VRInitError_None;
 	m_pHMD = vr::VR_Init(&eError, vr::VRApplication_Scene);
@@ -149,7 +149,6 @@ bool CMainApplication::BInit()
 		m_pHMD = NULL;
 		char buf[1024];
 		sprintf_s(buf, sizeof(buf), "Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
-		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VR_Init Failed", buf, NULL);
 		return false;
 	}
 
@@ -161,18 +160,6 @@ bool CMainApplication::BInit()
 
 		char buf[1024];
 		sprintf_s(buf, sizeof(buf), "Unable to get render model interface: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
-		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VR_Init Failed", buf, NULL);
-		return false;
-	}
-
-	int nWindowPosX = 700;
-	int nWindowPosY = 100;
-	Uint32 unWindowFlags = SDL_WINDOW_SHOWN;
-
-	m_pCompanionWindow = SDL_CreateWindow("hellovr [D3D12]", nWindowPosX, nWindowPosY, m_nCompanionWindowWidth, m_nCompanionWindowHeight, unWindowFlags);
-	if (m_pCompanionWindow == NULL)
-	{
-		dprintf("%s - Window could not be created! SDL Error: %s\n", __FUNCTION__, SDL_GetError());
 		return false;
 	}
 
@@ -182,8 +169,10 @@ bool CMainApplication::BInit()
 	m_strDriver = GetTrackedDeviceString(m_pHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);
 	m_strDisplay = GetTrackedDeviceString(m_pHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
 
-	std::string strWindowTitle = "hellovr [D3D12] - " + m_strDriver + " " + m_strDisplay;
-	SDL_SetWindowTitle(m_pCompanionWindow, strWindowTitle.c_str());
+	if (!m_sdl->Initialize(m_strDriver, m_strDisplay))
+	{
+		return false;
+	}
 
 	// cube array
 	m_iSceneVolumeWidth = m_iSceneVolumeInit;
@@ -272,19 +261,14 @@ bool CMainApplication::BInitD3D12()
 	// Create the swapchain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.BufferCount = g_nFrameCount;
-	swapChainDesc.Width = m_nCompanionWindowWidth;
-	swapChainDesc.Height = m_nCompanionWindowHeight;
+	swapChainDesc.Width = m_sdl->Width();
+	swapChainDesc.Height = m_sdl->Height();
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
 
-	// Determine the HWND from SDL
-	struct SDL_SysWMinfo wmInfo;
-	SDL_VERSION(&wmInfo.version);
-	SDL_GetWindowWMInfo(m_pCompanionWindow, &wmInfo);
-	HWND hWnd = wmInfo.info.win.window;
-
+	auto hWnd = reinterpret_cast<HWND>(m_sdl->HWND());
 	ComPtr<IDXGISwapChain1> pSwapChain;
 	if (FAILED(pFactory->CreateSwapChainForHwnd(m_pCommandQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr, &pSwapChain)))
 	{
@@ -430,55 +414,9 @@ bool CMainApplication::BInitCompositor()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CMainApplication::Shutdown()
-{
-	if (m_pHMD)
-	{
-		vr::VR_Shutdown();
-		m_pHMD = NULL;
-	}
-
-	for (std::vector<DX12RenderModel *>::iterator i = m_vecRenderModels.begin(); i != m_vecRenderModels.end(); i++)
-	{
-		delete (*i);
-	}
-	m_vecRenderModels.clear();
-
-	if (m_pCompanionWindow)
-	{
-		SDL_DestroyWindow(m_pCompanionWindow);
-		m_pCompanionWindow = NULL;
-	}
-
-	SDL_Quit();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
 bool CMainApplication::HandleInput()
 {
-	SDL_Event sdlEvent;
-	bool bRet = false;
-
-	while (SDL_PollEvent(&sdlEvent) != 0)
-	{
-		if (sdlEvent.type == SDL_QUIT)
-		{
-			bRet = true;
-		}
-		else if (sdlEvent.type == SDL_KEYDOWN)
-		{
-			if (sdlEvent.key.keysym.sym == SDLK_ESCAPE || sdlEvent.key.keysym.sym == SDLK_q)
-			{
-				bRet = true;
-			}
-			if (sdlEvent.key.keysym.sym == SDLK_c)
-			{
-				m_bShowCubes = !m_bShowCubes;
-			}
-		}
-	}
+	bool bRet = m_sdl->HandleInput(&m_bShowCubes);
 
 	// Process SteamVR events
 	vr::VREvent_t event;
@@ -506,18 +444,12 @@ bool CMainApplication::HandleInput()
 void CMainApplication::RunMainLoop()
 {
 	bool bQuit = false;
-
-	SDL_StartTextInput();
-	SDL_ShowCursor(SDL_DISABLE);
-
 	while (!bQuit)
 	{
 		bQuit = HandleInput();
 
 		RenderFrame();
 	}
-
-	SDL_StopTextInput();
 }
 
 //-----------------------------------------------------------------------------
@@ -1507,8 +1439,10 @@ void CMainApplication::RenderCompanionWindow()
 	rtvHandle.Offset(RTV_SWAPCHAIN0 + m_nFrameIndex, m_nRTVDescriptorSize);
 	m_pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
 
-	D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nCompanionWindowWidth, (FLOAT)m_nCompanionWindowHeight, 0.0f, 1.0f};
-	D3D12_RECT scissor = {0, 0, (LONG)m_nCompanionWindowWidth, (LONG)m_nCompanionWindowHeight};
+	auto w = m_sdl->Width();
+	auto h = m_sdl->Height();
+	D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)w, (FLOAT)h, 0.0f, 1.0f};
+	D3D12_RECT scissor = {0, 0, (LONG)w, (LONG)h};
 
 	m_pCommandList->RSSetViewports(1, &viewport);
 	m_pCommandList->RSSetScissorRects(1, &scissor);

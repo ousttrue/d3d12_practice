@@ -4,6 +4,7 @@ project(hello12)
 add_executable(${PROJECT_NAME}
     CMainApplication.cpp
     DX12RenderModel.cpp
+    SDLApplication.cpp
     main.cpp
     lodepng.cpp
     Matrices.cpp

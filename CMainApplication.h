@@ -1,7 +1,6 @@
 #pragma once
 #include <openvr.h>
 #include <vector>
-#include <SDL.h>
 #include <wrl/client.h>
 #include <dxgi1_4.h>
 #include "d3dx12.h"
@@ -48,7 +47,6 @@ public:
 
     void SetupRenderModels();
 
-    void Shutdown();
 
     void RunMainLoop();
     bool HandleInput();
@@ -102,9 +100,7 @@ private:
     bool m_rbShowTrackedDevice[vr::k_unMaxTrackedDeviceCount];
 
 private: // SDL bookkeeping
-    SDL_Window *m_pCompanionWindow;
-    uint32_t m_nCompanionWindowWidth;
-    uint32_t m_nCompanionWindowHeight;
+    class SDLApplication *m_sdl = nullptr;
 
 private:
     int m_iTrackedControllerCount;
