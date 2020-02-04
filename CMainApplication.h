@@ -35,8 +35,12 @@ enum CBVSRVIndex_t
     NUM_SRV_CBVS
 };
 
+
+
 class CMainApplication
 {
+    class HMD *m_hmd = nullptr;
+
 public:
     CMainApplication(int msaa, float flSuperSampleScale);
     virtual ~CMainApplication();
@@ -63,34 +67,18 @@ public:
 
     bool SetupStereoRenderTargets();
     void SetupCompanionWindow();
-    void SetupCameras();
 
     void RenderStereoTargets();
     void RenderCompanionWindow();
     void RenderScene(vr::Hmd_Eye nEye);
-
-    Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
-    Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
-    Matrix4 GetCurrentViewProjectionMatrix(vr::Hmd_Eye nEye);
-    void UpdateHMDMatrixPose();
-
-    Matrix4 ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose);
-
     bool CreateAllShaders();
-
     void SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex);
     class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName);
 
 private:
-    vr::IVRSystem *m_pHMD = nullptr;
     vr::IVRRenderModels *m_pRenderModels = nullptr;
     int m_nMSAASampleCount;
     float m_flSuperSampleScale;
-    std::string m_strDriver;
-    std::string m_strDisplay;
-    vr::TrackedDevicePose_t m_rTrackedDevicePose[vr::k_unMaxTrackedDeviceCount];
-    Matrix4 m_rmat4DevicePose[vr::k_unMaxTrackedDeviceCount];
-    bool m_rbShowTrackedDevice[vr::k_unMaxTrackedDeviceCount];
 
 private: // SDL bookkeeping
     class SDLApplication *m_sdl = nullptr;
@@ -103,7 +91,6 @@ private:
     bool m_bShowCubes;
 
     std::string m_strPoseClasses;                        // what classes we saw poses for this frame
-    char m_rDevClassChar[vr::k_unMaxTrackedDeviceCount]; // for each device, a character representing its class
 
     int m_iSceneVolumeWidth;
     int m_iSceneVolumeHeight;
@@ -111,9 +98,6 @@ private:
     float m_fScaleSpacing;
     float m_fScale;
 
-
-    float m_fNearClip;
-    float m_fFarClip;
 
     unsigned int m_uiVertcount;
     unsigned int m_uiCompanionWindowIndexSize;
@@ -161,14 +145,6 @@ private:
     D3D12_VERTEX_BUFFER_VIEW m_controllerAxisVertexBufferView;
 
     unsigned int m_uiControllerVertcount;
-
-    Matrix4 m_mat4HMDPose;
-    Matrix4 m_mat4eyePosLeft;
-    Matrix4 m_mat4eyePosRight;
-
-    Matrix4 m_mat4ProjectionCenter;
-    Matrix4 m_mat4ProjectionLeft;
-    Matrix4 m_mat4ProjectionRight;
 
     struct VertexDataScene
     {

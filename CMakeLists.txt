@@ -6,6 +6,7 @@ add_executable(${PROJECT_NAME}
     DX12RenderModel.cpp
     SDLApplication.cpp
     Commandline.cpp
+    Hmd.cpp
     dprintf.cpp
     main.cpp
     lodepng.cpp

@@ -3,6 +3,7 @@
 #include "DX12RenderModel.h"
 #include "SDLApplication.h"
 #include "dprintf.h"
+#include "Hmd.h"
 #include <D3Dcompiler.h>
 #include <stdio.h>
 #include <string>
@@ -35,13 +36,10 @@ void ThreadSleep(unsigned long nMilliseconds)
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
-	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale), m_sdl(new SDLApplication),
+	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale), m_sdl(new SDLApplication), m_hmd(new HMD),
 	  m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1), m_strPoseClasses(""), m_bShowCubes(true), m_nFrameIndex(0), m_fenceEvent(NULL), m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
 {
 	memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
-
-	// other initialization tasks are done in BInit
-	memset(m_rDevClassChar, 0, sizeof(m_rDevClassChar));
 };
 
 //-----------------------------------------------------------------------------
@@ -49,11 +47,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
 //-----------------------------------------------------------------------------
 CMainApplication::~CMainApplication()
 {
-	if (m_pHMD)
-	{
-		vr::VR_Shutdown();
-		m_pHMD = NULL;
-	}
+	delete m_hmd;
 
 	for (std::vector<DX12RenderModel *>::iterator i = m_vecRenderModels.begin(); i != m_vecRenderModels.end(); i++)
 	{
@@ -66,57 +60,29 @@ CMainApplication::~CMainApplication()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Helper to get a string from a tracked device property and turn it
-//			into a std::string
-//-----------------------------------------------------------------------------
-std::string GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t unDevice, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *peError = NULL)
-{
-	uint32_t unRequiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, NULL, 0, peError);
-	if (unRequiredBufferLen == 0)
-		return "";
-
-	char *pchBuffer = new char[unRequiredBufferLen];
-	unRequiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, pchBuffer, unRequiredBufferLen, peError);
-	std::string sResult = pchBuffer;
-	delete[] pchBuffer;
-	return sResult;
-}
-
-//-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 bool CMainApplication::BInit(bool bDebugD3D12, int iSceneVolumeInit)
 {
 	// Loading the SteamVR Runtime
-	vr::EVRInitError eError = vr::VRInitError_None;
-	m_pHMD = vr::VR_Init(&eError, vr::VRApplication_Scene);
-
-	if (eError != vr::VRInitError_None)
+	if (!m_hmd->Initialize())
 	{
-		m_pHMD = NULL;
-		char buf[1024];
-		sprintf_s(buf, sizeof(buf), "Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		return false;
 	}
 
+	vr::EVRInitError eError;
 	m_pRenderModels = (vr::IVRRenderModels *)vr::VR_GetGenericInterface(vr::IVRRenderModels_Version, &eError);
 	if (!m_pRenderModels)
 	{
-		m_pHMD = NULL;
-		vr::VR_Shutdown();
+		// m_pHMD = NULL;
+		// vr::VR_Shutdown();
 
-		char buf[1024];
-		sprintf_s(buf, sizeof(buf), "Unable to get render model interface: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
+		// char buf[1024];
+		// sprintf_s(buf, sizeof(buf), "Unable to get render model interface: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		return false;
 	}
 
-	m_strDriver = "No Driver";
-	m_strDisplay = "No Display";
-
-	m_strDriver = GetTrackedDeviceString(m_pHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);
-	m_strDisplay = GetTrackedDeviceString(m_pHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
-
-	if (!m_sdl->Initialize(m_strDriver, m_strDisplay))
+	if (!m_sdl->Initialize(m_hmd->SystemName(), m_hmd->SerialNumber()))
 	{
 		return false;
 	}
@@ -128,9 +94,6 @@ bool CMainApplication::BInit(bool bDebugD3D12, int iSceneVolumeInit)
 
 	m_fScale = 0.3f;
 	m_fScaleSpacing = 4.0f;
-
-	m_fNearClip = 0.1f;
-	m_fFarClip = 30.0f;
 
 	m_uiVertcount = 0;
 
@@ -178,8 +141,7 @@ bool CMainApplication::BInitD3D12(bool bDebugD3D12)
 	}
 
 	// Query OpenVR for the output adapter index
-	int32_t nAdapterIndex = 0;
-	m_pHMD->GetDXGIOutputInfo(&nAdapterIndex);
+	int32_t nAdapterIndex = m_hmd->AdapterIndex();
 
 	ComPtr<IDXGIAdapter1> pAdapter;
 	if (FAILED(pFactory->EnumAdapters1(nAdapterIndex, &pAdapter)))
@@ -322,7 +284,7 @@ bool CMainApplication::BInitD3D12(bool bDebugD3D12)
 
 	SetupTexturemaps();
 	SetupScene();
-	SetupCameras();
+	m_hmd->SetupCameras();
 	SetupStereoRenderTargets();
 	SetupCompanionWindow();
 	SetupRenderModels();
@@ -367,20 +329,13 @@ bool CMainApplication::HandleInput()
 
 	// Process SteamVR events
 	vr::VREvent_t event;
-	while (m_pHMD->PollNextEvent(&event, sizeof(event)))
+	while (m_hmd->Hmd()->PollNextEvent(&event, sizeof(event)))
 	{
 		ProcessVREvent(event);
 	}
 
 	// Process SteamVR controller state
-	for (vr::TrackedDeviceIndex_t unDevice = 0; unDevice < vr::k_unMaxTrackedDeviceCount; unDevice++)
-	{
-		vr::VRControllerState_t state;
-		if (m_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
-		{
-			m_rbShowTrackedDevice[unDevice] = state.ulButtonPressed == 0;
-		}
-	}
+	m_hmd->Update();
 
 	return bRet;
 }
@@ -430,7 +385,7 @@ void CMainApplication::ProcessVREvent(const vr::VREvent_t &event)
 //-----------------------------------------------------------------------------
 void CMainApplication::RenderFrame()
 {
-	if (m_pHMD)
+	if (m_hmd->Hmd())
 	{
 		m_pCommandAllocators[m_nFrameIndex]->Reset();
 
@@ -492,7 +447,7 @@ void CMainApplication::RenderFrame()
 		dprintf("PoseCount:%d(%s) Controllers:%d\n", m_iValidPoseCount, m_strPoseClasses.c_str(), m_iTrackedControllerCount);
 	}
 
-	UpdateHMDMatrixPose();
+	m_hmd->UpdateHMDMatrixPose(m_iValidPoseCount, m_strPoseClasses);
 }
 
 //-----------------------------------------------------------------------------
@@ -898,7 +853,7 @@ void CMainApplication::GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcW
 //-----------------------------------------------------------------------------
 void CMainApplication::SetupScene()
 {
-	if (!m_pHMD)
+	if (!m_hmd->Hmd())
 		return;
 
 	std::vector<float> vertdataarray;
@@ -1024,7 +979,7 @@ void CMainApplication::AddCubeToScene(Matrix4 mat, std::vector<float> &vertdata)
 void CMainApplication::UpdateControllerAxes()
 {
 	// Don't attempt to update controllers if input is not available
-	if (!m_pHMD->IsInputAvailable())
+	if (!m_hmd->Hmd()->IsInputAvailable())
 		return;
 
 	std::vector<float> vertdataarray;
@@ -1034,18 +989,18 @@ void CMainApplication::UpdateControllerAxes()
 
 	for (vr::TrackedDeviceIndex_t unTrackedDevice = vr::k_unTrackedDeviceIndex_Hmd + 1; unTrackedDevice < vr::k_unMaxTrackedDeviceCount; ++unTrackedDevice)
 	{
-		if (!m_pHMD->IsTrackedDeviceConnected(unTrackedDevice))
+		if (!m_hmd->Hmd()->IsTrackedDeviceConnected(unTrackedDevice))
 			continue;
 
-		if (m_pHMD->GetTrackedDeviceClass(unTrackedDevice) != vr::TrackedDeviceClass_Controller)
+		if (m_hmd->Hmd()->GetTrackedDeviceClass(unTrackedDevice) != vr::TrackedDeviceClass_Controller)
 			continue;
 
 		m_iTrackedControllerCount += 1;
 
-		if (!m_rTrackedDevicePose[unTrackedDevice].bPoseIsValid)
+		if (!m_hmd->PoseIsValid(unTrackedDevice))
 			continue;
 
-		const Matrix4 &mat = m_rmat4DevicePose[unTrackedDevice];
+		const Matrix4 &mat = m_hmd->DevicePose(unTrackedDevice);
 
 		Vector4 center = mat * Vector4(0, 0, 0, 1);
 
@@ -1127,17 +1082,6 @@ void CMainApplication::UpdateControllerAxes()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-void CMainApplication::SetupCameras()
-{
-	m_mat4ProjectionLeft = GetHMDMatrixProjectionEye(vr::Eye_Left);
-	m_mat4ProjectionRight = GetHMDMatrixProjectionEye(vr::Eye_Right);
-	m_mat4eyePosLeft = GetHMDMatrixPoseEye(vr::Eye_Left);
-	m_mat4eyePosRight = GetHMDMatrixPoseEye(vr::Eye_Right);
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: Creates a frame buffer. Returns true if the buffer was set up.
 //          Returns false if the setup failed.
 //-----------------------------------------------------------------------------
@@ -1197,10 +1141,10 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 //-----------------------------------------------------------------------------
 bool CMainApplication::SetupStereoRenderTargets()
 {
-	if (!m_pHMD)
+	if (!m_hmd->Hmd())
 		return false;
 
-	m_pHMD->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
+	m_hmd->Hmd()->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
 	m_nRenderWidth = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderWidth);
 	m_nRenderHeight = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderHeight);
 
@@ -1214,7 +1158,7 @@ bool CMainApplication::SetupStereoRenderTargets()
 //-----------------------------------------------------------------------------
 void CMainApplication::SetupCompanionWindow()
 {
-	if (!m_pHMD)
+	if (!m_hmd->Hmd())
 		return;
 
 	std::vector<VertexDataWindow> vVerts;
@@ -1330,7 +1274,7 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye)
 		m_pCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
 
 		// Update the persistently mapped pointer to the CB data with the latest matrix
-		memcpy(m_pSceneConstantBufferData[nEye], GetCurrentViewProjectionMatrix(nEye).get(), sizeof(Matrix4));
+		memcpy(m_pSceneConstantBufferData[nEye], m_hmd->GetCurrentViewProjectionMatrix(nEye).get(), sizeof(Matrix4));
 
 		// Draw
 		m_pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1338,7 +1282,7 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye)
 		m_pCommandList->DrawInstanced(m_uiVertcount, 1, 0, 0);
 	}
 
-	bool bIsInputAvailable = m_pHMD->IsInputAvailable();
+	bool bIsInputAvailable = m_hmd->Hmd()->IsInputAvailable();
 
 	if (bIsInputAvailable && m_pControllerAxisVertexBuffer)
 	{
@@ -1354,18 +1298,19 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye)
 	m_pCommandList->SetPipelineState(m_pRenderModelPipelineState.Get());
 	for (uint32_t unTrackedDevice = 0; unTrackedDevice < vr::k_unMaxTrackedDeviceCount; unTrackedDevice++)
 	{
-		if (!m_rTrackedDeviceToRenderModel[unTrackedDevice] || !m_rbShowTrackedDevice[unTrackedDevice])
+		if (!m_rTrackedDeviceToRenderModel[unTrackedDevice])
 			continue;
 
-		const vr::TrackedDevicePose_t &pose = m_rTrackedDevicePose[unTrackedDevice];
-		if (!pose.bPoseIsValid)
+		if (!m_hmd->IsVisible(unTrackedDevice))
 			continue;
 
-		if (!bIsInputAvailable && m_pHMD->GetTrackedDeviceClass(unTrackedDevice) == vr::TrackedDeviceClass_Controller)
+		if (!m_hmd->PoseIsValid(unTrackedDevice))
 			continue;
 
-		const Matrix4 &matDeviceToTracking = m_rmat4DevicePose[unTrackedDevice];
-		Matrix4 matMVP = GetCurrentViewProjectionMatrix(nEye) * matDeviceToTracking;
+		if (!bIsInputAvailable && m_hmd->Hmd()->GetTrackedDeviceClass(unTrackedDevice) == vr::TrackedDeviceClass_Controller)
+			continue;
+
+		Matrix4 matMVP = m_hmd->GetCurrentViewProjectionMatrix(nEye) * m_hmd->DevicePose(unTrackedDevice);
 
 		m_rTrackedDeviceToRenderModel[unTrackedDevice]->Draw(nEye, m_pCommandList.Get(), m_nCBVSRVDescriptorSize, matMVP);
 	}
@@ -1412,113 +1357,6 @@ void CMainApplication::RenderCompanionWindow()
 
 	// Transition swapchain image to PRESENT
 	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_nFrameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Gets a Matrix Projection Eye with respect to nEye.
-//-----------------------------------------------------------------------------
-Matrix4 CMainApplication::GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye)
-{
-	if (!m_pHMD)
-		return Matrix4();
-
-	vr::HmdMatrix44_t mat = m_pHMD->GetProjectionMatrix(nEye, m_fNearClip, m_fFarClip);
-
-	return Matrix4(
-		mat.m[0][0], mat.m[1][0], mat.m[2][0], mat.m[3][0],
-		mat.m[0][1], mat.m[1][1], mat.m[2][1], mat.m[3][1],
-		mat.m[0][2], mat.m[1][2], mat.m[2][2], mat.m[3][2],
-		mat.m[0][3], mat.m[1][3], mat.m[2][3], mat.m[3][3]);
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Gets an HMDMatrixPoseEye with respect to nEye.
-//-----------------------------------------------------------------------------
-Matrix4 CMainApplication::GetHMDMatrixPoseEye(vr::Hmd_Eye nEye)
-{
-	if (!m_pHMD)
-		return Matrix4();
-
-	vr::HmdMatrix34_t matEyeRight = m_pHMD->GetEyeToHeadTransform(nEye);
-	Matrix4 matrixObj(
-		matEyeRight.m[0][0], matEyeRight.m[1][0], matEyeRight.m[2][0], 0.0,
-		matEyeRight.m[0][1], matEyeRight.m[1][1], matEyeRight.m[2][1], 0.0,
-		matEyeRight.m[0][2], matEyeRight.m[1][2], matEyeRight.m[2][2], 0.0,
-		matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f);
-
-	return matrixObj.invert();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Gets a Current View Projection Matrix with respect to nEye,
-//          which may be an Eye_Left or an Eye_Right.
-//-----------------------------------------------------------------------------
-Matrix4 CMainApplication::GetCurrentViewProjectionMatrix(vr::Hmd_Eye nEye)
-{
-	Matrix4 matMVP;
-	if (nEye == vr::Eye_Left)
-	{
-		matMVP = m_mat4ProjectionLeft * m_mat4eyePosLeft * m_mat4HMDPose;
-	}
-	else if (nEye == vr::Eye_Right)
-	{
-		matMVP = m_mat4ProjectionRight * m_mat4eyePosRight * m_mat4HMDPose;
-	}
-
-	return matMVP;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-void CMainApplication::UpdateHMDMatrixPose()
-{
-	if (!m_pHMD)
-		return;
-
-	vr::VRCompositor()->WaitGetPoses(m_rTrackedDevicePose, vr::k_unMaxTrackedDeviceCount, NULL, 0);
-
-	m_iValidPoseCount = 0;
-	m_strPoseClasses = "";
-	for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; ++nDevice)
-	{
-		if (m_rTrackedDevicePose[nDevice].bPoseIsValid)
-		{
-			m_iValidPoseCount++;
-			m_rmat4DevicePose[nDevice] = ConvertSteamVRMatrixToMatrix4(m_rTrackedDevicePose[nDevice].mDeviceToAbsoluteTracking);
-			if (m_rDevClassChar[nDevice] == 0)
-			{
-				switch (m_pHMD->GetTrackedDeviceClass(nDevice))
-				{
-				case vr::TrackedDeviceClass_Controller:
-					m_rDevClassChar[nDevice] = 'C';
-					break;
-				case vr::TrackedDeviceClass_HMD:
-					m_rDevClassChar[nDevice] = 'H';
-					break;
-				case vr::TrackedDeviceClass_Invalid:
-					m_rDevClassChar[nDevice] = 'I';
-					break;
-				case vr::TrackedDeviceClass_GenericTracker:
-					m_rDevClassChar[nDevice] = 'G';
-					break;
-				case vr::TrackedDeviceClass_TrackingReference:
-					m_rDevClassChar[nDevice] = 'T';
-					break;
-				default:
-					m_rDevClassChar[nDevice] = '?';
-					break;
-				}
-			}
-			m_strPoseClasses += m_rDevClassChar[nDevice];
-		}
-	}
-
-	if (m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid)
-	{
-		m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
-		m_mat4HMDPose.invert();
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -1603,17 +1441,16 @@ void CMainApplication::SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t
 		return;
 
 	// try to find a model we've already set up
-	std::string sRenderModelName = GetTrackedDeviceString(m_pHMD, unTrackedDeviceIndex, vr::Prop_RenderModelName_String);
+	auto sRenderModelName = m_hmd->RenderModelName(unTrackedDeviceIndex);
 	DX12RenderModel *pRenderModel = FindOrLoadRenderModel(unTrackedDeviceIndex, sRenderModelName.c_str());
 	if (!pRenderModel)
 	{
-		std::string sTrackingSystemName = GetTrackedDeviceString(m_pHMD, unTrackedDeviceIndex, vr::Prop_TrackingSystemName_String);
+		std::string sTrackingSystemName = m_hmd->SystemName(unTrackedDeviceIndex);
 		dprintf("Unable to load render model for tracked device %d (%s.%s)", unTrackedDeviceIndex, sTrackingSystemName.c_str(), sRenderModelName.c_str());
 	}
 	else
 	{
 		m_rTrackedDeviceToRenderModel[unTrackedDeviceIndex] = pRenderModel;
-		m_rbShowTrackedDevice[unTrackedDeviceIndex] = true;
 	}
 }
 
@@ -1624,27 +1461,14 @@ void CMainApplication::SetupRenderModels()
 {
 	memset(m_rTrackedDeviceToRenderModel, 0, sizeof(m_rTrackedDeviceToRenderModel));
 
-	if (!m_pHMD)
+	if (!m_hmd->Hmd())
 		return;
 
 	for (uint32_t unTrackedDevice = vr::k_unTrackedDeviceIndex_Hmd + 1; unTrackedDevice < vr::k_unMaxTrackedDeviceCount; unTrackedDevice++)
 	{
-		if (!m_pHMD->IsTrackedDeviceConnected(unTrackedDevice))
+		if (!m_hmd->Hmd()->IsTrackedDeviceConnected(unTrackedDevice))
 			continue;
 
 		SetupRenderModelForTrackedDevice(unTrackedDevice);
 	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Converts a SteamVR matrix to our local matrix class
-//-----------------------------------------------------------------------------
-Matrix4 CMainApplication::ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose)
-{
-	Matrix4 matrixObj(
-		matPose.m[0][0], matPose.m[1][0], matPose.m[2][0], 0.0,
-		matPose.m[0][1], matPose.m[1][1], matPose.m[2][1], 0.0,
-		matPose.m[0][2], matPose.m[1][2], matPose.m[2][2], 0.0,
-		matPose.m[0][3], matPose.m[1][3], matPose.m[2][3], 1.0f);
-	return matrixObj;
 }
