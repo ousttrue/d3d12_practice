@@ -8,7 +8,7 @@
             "name": "hello12",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/hello12.exe",
+            "program": "${workspaceFolder}/build/hellovr_dx12/hellovr_dx12.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
