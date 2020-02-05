@@ -48,14 +48,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
 CMainApplication::~CMainApplication()
 {
 	delete m_hmd;
-
-	for (std::vector<DX12RenderModel *>::iterator i = m_vecRenderModels.begin(); i != m_vecRenderModels.end(); i++)
-	{
-		delete (*i);
-	}
-	m_vecRenderModels.clear();
 	delete m_sdl;
-	// work is done in Shutdown
 	dprintf("Shutdown");
 }
 
@@ -1353,17 +1346,6 @@ void CMainApplication::RenderCompanionWindow()
 DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName)
 {
 	DX12RenderModel *pRenderModel = NULL;
-	// To simplify the D3D12 rendering code, create an instance of the model for each model name.  This is less efficient
-	// memory wise, but simplifies the rendering code so we can store the transform in a constant buffer associated with
-	// the model itself.  You would not want to do this in a production application.
-	//for( std::vector< DX12RenderModel * >::iterator i = m_vecRenderModels.begin(); i != m_vecRenderModels.end(); i++ )
-	//{
-	//if( !stricmp( (*i)->GetName().c_str(), pchRenderModelName ) )
-	//{
-	//	pRenderModel = *i;
-	//	break;
-	//}
-	//}
 
 	// load the model if we didn't find one
 	if (!pRenderModel)
@@ -1408,10 +1390,6 @@ DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_
 			dprintf("Unable to create D3D12 model from render model %s\n", pchRenderModelName);
 			delete pRenderModel;
 			pRenderModel = NULL;
-		}
-		else
-		{
-			m_vecRenderModels.push_back(pRenderModel);
 		}
 		vr::VRRenderModels()->FreeRenderModel(pModel);
 		vr::VRRenderModels()->FreeTexture(pTexture);

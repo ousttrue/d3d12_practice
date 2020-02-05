@@ -174,6 +174,5 @@ private:
     uint32_t m_nRenderWidth;
     uint32_t m_nRenderHeight;
 
-    std::vector<DX12RenderModel *> m_vecRenderModels;
     DX12RenderModel *m_rTrackedDeviceToRenderModel[vr::k_unMaxTrackedDeviceCount];
 };
