@@ -76,7 +76,6 @@ public:
     class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName);
 
 private:
-    vr::IVRRenderModels *m_pRenderModels = nullptr;
     int m_nMSAASampleCount;
     float m_flSuperSampleScale;
 
