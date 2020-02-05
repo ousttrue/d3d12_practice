@@ -1,8 +1,14 @@
 # D3D12 practice
 
+## HelloTriangle
+
+from https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12HelloWorld/src/HelloTriangle
+
+## hellovr_dx12
+
 from https://github.com/ValveSoftware/openvr/tree/master/samples/hellovr_dx12
 
-## TODO:
+### TODO:
 
 * separate small classes
     * [X] SDL

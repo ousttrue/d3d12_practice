@@ -5,7 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "hello12",
+            "name": "HelloTriangle",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/HelloTriangle/HelloTriangle.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
+            "name": "hellovr_dx12",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/hellovr_dx12/hellovr_dx12.exe",
@@ -17,7 +28,6 @@
                     "name": "PATH",
                     "value": "${env:VCPKG_DIR}/installed/x64-windows/bin"
                 }
-
             ],
             "externalConsole": false
         }
