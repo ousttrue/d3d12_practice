@@ -66,11 +66,11 @@ class D3D12HelloTriangle
 
 public:
     D3D12HelloTriangle(UINT width, UINT height, std::wstring name);
+    ~D3D12HelloTriangle();
 
     virtual void OnInit(HWND hWnd, bool useWarpDevice);
     virtual void OnUpdate();
     virtual void OnRender();
-    virtual void OnDestroy();
 
     // Samples override the event handlers to handle specific messages.
     virtual void OnKeyDown(UINT8 /*key*/) {}

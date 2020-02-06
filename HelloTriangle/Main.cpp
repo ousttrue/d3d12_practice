@@ -58,12 +58,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-// // Helper function for setting the window's title text.
-// void D3D12HelloTriangle::SetCustomWindowText(LPCWSTR text)
-// {
-//     std::wstring windowText = m_title + L": " + text;
-//     SetWindowText(Win32Application::GetHwnd(), windowText.c_str());
-// }
 
 struct CommandLine
 {
@@ -144,8 +138,6 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
             DispatchMessage(&msg);
         }
     }
-
-    sample.OnDestroy();
 
     // Return this part of the WM_QUIT message to Windows.
     return static_cast<char>(msg.wParam);

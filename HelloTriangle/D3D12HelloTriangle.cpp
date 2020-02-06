@@ -70,8 +70,6 @@ static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft:
 }
 //////////////////////////////////////////////////////////////////////////////
 
-
-
 D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) : m_width(width),
                                                                                      m_height(height),
                                                                                      m_frameIndex(0),
@@ -84,6 +82,15 @@ D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring nam
     m_assetsPath = assetsPath;
 
     m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+}
+
+D3D12HelloTriangle::~D3D12HelloTriangle()
+{
+    // Ensure that the GPU is no longer referencing resources that are about to be
+    // cleaned up by the destructor.
+    WaitForPreviousFrame();
+
+    CloseHandle(m_fenceEvent);
 }
 
 void D3D12HelloTriangle::OnInit(HWND hWnd, bool useWarpDevice)
@@ -313,15 +320,6 @@ void D3D12HelloTriangle::OnRender()
     ThrowIfFailed(m_swapChain->Present(1, 0));
 
     WaitForPreviousFrame();
-}
-
-void D3D12HelloTriangle::OnDestroy()
-{
-    // Ensure that the GPU is no longer referencing resources that are about to be
-    // cleaned up by the destructor.
-    WaitForPreviousFrame();
-
-    CloseHandle(m_fenceEvent);
 }
 
 void D3D12HelloTriangle::PopulateCommandList()
