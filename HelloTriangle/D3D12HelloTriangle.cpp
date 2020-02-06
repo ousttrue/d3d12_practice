@@ -16,22 +16,8 @@ const std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
-D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) : DXSample(width, height, name),
-                                                                                     m_frameIndex(0),
-                                                                                     m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
-                                                                                     m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height)),
-                                                                                     m_rtvDescriptorSize(0)
-{
-}
-
-void D3D12HelloTriangle::OnInit()
-{
-    LoadPipeline();
-    LoadAssets();
-}
-
-// Load the rendering pipeline dependencies.
-void D3D12HelloTriangle::LoadPipeline()
+//////////////////////////////////////////////////////////////////////////////
+static Microsoft::WRL::ComPtr<IDXGIFactory4> CreateFactory()
 {
     UINT dxgiFactoryFlags = 0;
 
@@ -53,6 +39,56 @@ void D3D12HelloTriangle::LoadPipeline()
     ComPtr<IDXGIFactory4> factory;
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
+    return factory;
+}
+
+// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
+// If no such adapter can be found, *ppAdapter will be set to nullptr.
+static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft::WRL::ComPtr<IDXGIFactory2> &pFactory)
+{
+    ComPtr<IDXGIAdapter1> adapter;
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+    {
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        {
+            // Don't select the Basic Render Driver adapter.
+            // If you want a software adapter, pass in "/warp" on the command line.
+            continue;
+        }
+
+        // Check to see if the adapter supports Direct3D 12, but don't create the
+        // actual device yet.
+        if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+        {
+            return adapter;
+        }
+    }
+
+    return nullptr;
+}
+//////////////////////////////////////////////////////////////////////////////
+
+D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) : DXSample(width, height, name),
+                                                                                     m_frameIndex(0),
+                                                                                     m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
+                                                                                     m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height)),
+                                                                                     m_rtvDescriptorSize(0)
+{
+}
+
+void D3D12HelloTriangle::OnInit()
+{
+    LoadPipeline();
+    LoadAssets();
+}
+
+// Load the rendering pipeline dependencies.
+void D3D12HelloTriangle::LoadPipeline()
+{
+    auto factory = CreateFactory();
+
     if (m_useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
@@ -65,8 +101,7 @@ void D3D12HelloTriangle::LoadPipeline()
     }
     else
     {
-        ComPtr<IDXGIAdapter1> hardwareAdapter;
-        GetHardwareAdapter(factory.Get(), &hardwareAdapter);
+        auto hardwareAdapter = GetHardwareAdapter(factory);
 
         ThrowIfFailed(D3D12CreateDevice(
             hardwareAdapter.Get(),
