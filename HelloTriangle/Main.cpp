@@ -1,14 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
 #include "stdafx.h"
 #include "D3D12HelloTriangle.h"
 
@@ -22,32 +11,28 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_CREATE:
     {
         // Save the DXSample* passed in to CreateWindow.
-        LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
+        auto pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+        return 0;
     }
-        return 0;
-
-    case WM_KEYDOWN:
-        if (pSample)
-        {
-            pSample->OnKeyDown(static_cast<UINT8>(wParam));
-        }
-        return 0;
-
-    case WM_KEYUP:
-        if (pSample)
-        {
-            pSample->OnKeyUp(static_cast<UINT8>(wParam));
-        }
-        return 0;
 
     case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        EndPaint(hWnd, &ps);
         if (pSample)
         {
-            pSample->OnUpdate();
-            pSample->OnRender();
+            pSample->Render(hWnd);
         }
         return 0;
+    }
+
+    case WM_SIZE:
+    {
+        pSample->SetSize(LOWORD(lParam), HIWORD(lParam));
+        return 0;
+    }
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -57,7 +42,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     // Handle any messages the switch statement didn't.
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
-
 
 struct CommandLine
 {
@@ -90,10 +74,10 @@ struct CommandLine
 
 _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    D3D12HelloTriangle sample(1280, 720, L"D3D12 Hello Triangle");
-
     CommandLine cmd;
     cmd.ParseCommandLineArgs();
+
+    D3D12HelloTriangle sample(cmd.m_useWarpDevice);
 
     // Initialize the window class.
     WNDCLASSEX windowClass = {0};
@@ -103,10 +87,10 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     windowClass.hInstance = hInstance;
     windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
     windowClass.lpszClassName = L"DXSampleClass";
-    RegisterClassEx(&windowClass);
-
-    RECT windowRect = {0, 0, static_cast<LONG>(sample.GetWidth()), static_cast<LONG>(sample.GetHeight())};
-    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+    if (!RegisterClassEx(&windowClass))
+    {
+        return 1;
+    }
 
     // Create the window and store a handle to it.
     auto hWnd = CreateWindow(
@@ -115,30 +99,33 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        windowRect.right - windowRect.left,
-        windowRect.bottom - windowRect.top,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
         nullptr, // We have no parent window.
         nullptr, // We aren't using menus.
         hInstance,
         &sample);
 
-    // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
-    sample.OnInit(hWnd, cmd.m_useWarpDevice);
+    RECT rect;
+    GetClientRect(hWnd, &rect);
+    sample.SetSize(rect.right-rect.left, rect.bottom-rect.top);
 
     ShowWindow(hWnd, nCmdShow);
 
     // Main sample loop.
-    MSG msg = {};
-    while (msg.message != WM_QUIT)
+    MSG msg;
+    while (true)
     {
-        // Process any messages in the queue.
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
+            if (msg.message == WM_QUIT)
+            {
+                break;
+            }
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
     }
 
-    // Return this part of the WM_QUIT message to Windows.
-    return static_cast<char>(msg.wParam);
+    return static_cast<int>(msg.wParam);
 }

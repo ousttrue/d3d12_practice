@@ -1,0 +1,30 @@
+{
+    "files.associations": {
+        "*.uss": "css",
+        "*.ipp": "cpp"
+    },
+    "cSpell.words": [
+        "DCOMPILE",
+        "Descs",
+        "GWLP",
+        "HREDRAW",
+        "HRESULT",
+        "HWND",
+        "IDXGI",
+        "LPARAM",
+        "LPCREATESTRUCT",
+        "LPSTR",
+        "LRESULT",
+        "PAINTSTRUCT",
+        "VREDRAW",
+        "WNDCLASSEX",
+        "XMFLOAT",
+        "countof",
+        "dxgi",
+        "hlsl",
+        "lpfn",
+        "uuidof",
+        "verts",
+        "wcsnicmp"
+    ]
+}
