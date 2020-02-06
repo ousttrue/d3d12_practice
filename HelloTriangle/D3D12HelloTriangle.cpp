@@ -4,6 +4,7 @@
 
 #include "D3D12HelloTriangle.h"
 #include "util.h"
+#include "Scene.h"
 #include <windows.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
@@ -12,20 +13,11 @@ const std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
-using namespace DirectX;
-
-// const UINT FrameCount = 2;
-
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT4 color;
-};
-
 class Impl
 {
     Fence m_fence;
     Swapchain m_swapchain;
+    Scene m_scene;
 
     bool m_useWarpDevice = false;
 
@@ -39,13 +31,11 @@ class Impl
     ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
+
+    // pipeline
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
-
-    // // App resources.
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
 public:
     Impl(bool useWarpDevice, UINT frameCount)
@@ -88,6 +78,7 @@ public:
         {
             LoadPipeline(hWnd);
             LoadAssets();
+            m_scene.Initialize(m_device, m_aspectRatio);
         }
 
         // Record all the commands we need to render the scene into the command list.
@@ -135,9 +126,8 @@ private:
         // Record commands.
         const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
         m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-        m_commandList->DrawInstanced(3, 1, 0, 0);
+
+        m_scene.Draw(m_commandList);
 
         // Indicate that the back buffer will now be used to present.
         m_commandList->ResourceBarrier(
@@ -251,42 +241,6 @@ private:
         // Command lists are created in the recording state, but there is nothing
         // to record yet. The main loop expects it to be closed, so close it now.
         ThrowIfFailed(m_commandList->Close());
-
-        // Create the vertex buffer.
-        {
-            // Define the geometry for a triangle.
-            Vertex triangleVertices[] =
-                {
-                    {{0.0f, 0.25f * m_aspectRatio, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-                    {{0.25f, -0.25f * m_aspectRatio, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-                    {{-0.25f, -0.25f * m_aspectRatio, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-
-            const UINT vertexBufferSize = sizeof(triangleVertices);
-
-            // Note: using upload heaps to transfer static data like vert buffers is not
-            // recommended. Every time the GPU needs it, the upload heap will be marshalled
-            // over. Please read up on Default Heap usage. An upload heap is used here for
-            // code simplicity and because there are very few verts to actually transfer.
-            ThrowIfFailed(m_device->CreateCommittedResource(
-                &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                D3D12_HEAP_FLAG_NONE,
-                &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_vertexBuffer)));
-
-            // Copy the triangle data to the vertex buffer.
-            UINT8 *pVertexDataBegin;
-            CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU.
-            ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
-            memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-            m_vertexBuffer->Unmap(0, nullptr);
-
-            // Initialize the vertex buffer view.
-            m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-            m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-            m_vertexBufferView.SizeInBytes = vertexBufferSize;
-        }
 
         // Create synchronization objects and wait until assets have been uploaded to the GPU.
         m_fence.Initialize(m_device);
