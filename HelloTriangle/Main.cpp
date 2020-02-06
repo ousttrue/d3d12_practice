@@ -2,6 +2,8 @@
 #include <Windows.h>
 #include <string>
 
+const auto FRAME_COUNT = 2;
+
 // Main message handler for the sample.
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -78,7 +80,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     CommandLine cmd;
     cmd.ParseCommandLineArgs();
 
-    D3D12HelloTriangle sample(cmd.m_useWarpDevice);
+    D3D12HelloTriangle sample(cmd.m_useWarpDevice, FRAME_COUNT);
 
     // Initialize the window class.
     WNDCLASSEX windowClass = {0};
@@ -109,7 +111,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
 
     RECT rect;
     GetClientRect(hWnd, &rect);
-    sample.SetSize(rect.right-rect.left, rect.bottom-rect.top);
+    sample.SetSize(rect.right - rect.left, rect.bottom - rect.top);
 
     ShowWindow(hWnd, nCmdShow);
 

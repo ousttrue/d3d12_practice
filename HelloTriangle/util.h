@@ -125,3 +125,73 @@ public:
         }
     }
 };
+
+class Swapchain
+{
+    ComPtr<IDXGISwapChain3> m_swapChain;
+    UINT m_frameIndex = 0;
+
+public:
+    Swapchain()
+    {
+    }
+    ~Swapchain()
+    {
+    }
+
+    void Initialize(const ComPtr<IDXGIFactory4> &factory,
+                    const ComPtr<ID3D12CommandQueue> &queue,
+                    UINT frameCount,
+                    HWND hWnd, UINT width, UINT height)
+    {
+        // Describe and create the swap chain.
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {
+            .Width = width,
+            .Height = height,
+            .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+            .SampleDesc = {
+                .Count = 1,
+            },
+            .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            .BufferCount = frameCount,
+            .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+        };
+
+        ComPtr<IDXGISwapChain1> swapChain;
+        ThrowIfFailed(factory->CreateSwapChainForHwnd(
+            queue.Get(), // Swap chain needs the queue so that it can force a flush on it.
+            hWnd,
+            &swapChainDesc,
+            nullptr,
+            nullptr,
+            &swapChain));
+
+        // This sample does not support fullscreen transitions.
+        ThrowIfFailed(factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER));
+
+        ThrowIfFailed(swapChain.As(&m_swapChain));
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+    }
+
+    void Present()
+    {
+        ThrowIfFailed(m_swapChain->Present(1, 0));
+    }
+
+    void UpdateFrameIndex()
+    {
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+    }
+
+    UINT FrameIndex() const
+    {
+        return m_frameIndex;
+    }
+
+    ComPtr<ID3D12Resource> GetResource(int n)
+    {
+        ComPtr<ID3D12Resource> resource;
+        ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&resource)));
+        return resource;
+    }
+};
