@@ -29,12 +29,15 @@ class Impl
     Swapchain m_swapchain;
 
     bool m_useWarpDevice = false;
+    UINT m_frameCount;
+
     // Viewport dimensions.
     float m_aspectRatio = 1.0f;
 
     // // Pipeline objects.
     D3D12_VIEWPORT m_viewport = {};
     D3D12_RECT m_scissorRect = {};
+
     ComPtr<ID3D12Device> m_device;
     std::vector<ComPtr<ID3D12Resource>> m_renderTargets;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
@@ -48,8 +51,6 @@ class Impl
     // // App resources.
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-
-    UINT m_frameCount;
 
 public:
     Impl(bool useWarpDevice, UINT frameCount)
@@ -145,20 +146,7 @@ private:
         ThrowIfFailed(m_commandList->Close());
     }
 
-    // void WaitForPreviousFrame()
-    // {
-    //     // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-    //     // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-    //     // sample illustrates how to use fences for efficient resource usage and to
-    //     // maximize GPU utilization.
-
-    //     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    // }
-
 private:
-    // D3D12HelloTriangle(UINT width, UINT height, std::wstring name);
-    // ~D3D12HelloTriangle();
-
     void OnInit(HWND hWnd)
     {
         LoadPipeline(hWnd);
