@@ -65,18 +65,41 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 //     SetWindowText(Win32Application::GetHwnd(), windowText.c_str());
 // }
 
+struct CommandLine
+{
+    // Adapter info.
+    bool m_useWarpDevice;
+
+    // Window title.
+    std::wstring m_title;
+
+    // Helper function for parsing any supplied command line args.
+    _Use_decl_annotations_ void ParseCommandLineArgs()
+    {
+        // Parse the command line parameters
+        int argc;
+        auto argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+        for (int i = 1; i < argc; ++i)
+        {
+            if (_wcsnicmp(argv[i], L"-warp", wcslen(argv[i])) == 0 ||
+                _wcsnicmp(argv[i], L"/warp", wcslen(argv[i])) == 0)
+            {
+                m_useWarpDevice = true;
+                m_title = m_title + L" (WARP)";
+            }
+        }
+
+        LocalFree(argv);
+    }
+};
+
 _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
     D3D12HelloTriangle sample(1280, 720, L"D3D12 Hello Triangle");
 
-    // return Win32Application::Run(&sample, hInstance, nCmdShow);
-    // Parse the command line parameters
-    {
-        int argc;
-        LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-        sample.ParseCommandLineArgs(argv, argc);
-        LocalFree(argv);
-    }
+    CommandLine cmd;
+    cmd.ParseCommandLineArgs();
 
     // Initialize the window class.
     WNDCLASSEX windowClass = {0};
@@ -94,7 +117,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     // Create the window and store a handle to it.
     auto hWnd = CreateWindow(
         windowClass.lpszClassName,
-        sample.GetTitle(),
+        cmd.m_title.c_str(),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
@@ -106,7 +129,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
         &sample);
 
     // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
-    sample.OnInit(hWnd);
+    sample.OnInit(hWnd, cmd.m_useWarpDevice);
 
     ShowWindow(hWnd, nCmdShow);
 

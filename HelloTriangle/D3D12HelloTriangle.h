@@ -29,14 +29,8 @@ class D3D12HelloTriangle
     UINT m_height;
     float m_aspectRatio;
 
-    // Adapter info.
-    bool m_useWarpDevice;
-
     // Root assets path.
     std::wstring m_assetsPath;
-
-    // Window title.
-    std::wstring m_title;
 
     static const UINT FrameCount = 2;
 
@@ -73,24 +67,21 @@ class D3D12HelloTriangle
 public:
     D3D12HelloTriangle(UINT width, UINT height, std::wstring name);
 
-    virtual void OnInit(HWND hWnd);
+    virtual void OnInit(HWND hWnd, bool useWarpDevice);
     virtual void OnUpdate();
     virtual void OnRender();
     virtual void OnDestroy();
 
     // Samples override the event handlers to handle specific messages.
-    virtual void OnKeyDown(UINT8 /*key*/)   {}
-    virtual void OnKeyUp(UINT8 /*key*/)     {}
-    
+    virtual void OnKeyDown(UINT8 /*key*/) {}
+    virtual void OnKeyUp(UINT8 /*key*/) {}
+
     // Accessors.
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }
-    const WCHAR *GetTitle() const { return m_title.c_str(); }
-
-    void ParseCommandLineArgs(_In_reads_(argc) WCHAR *argv[], int argc);
 
 private:
-    void LoadPipeline(HWND hWnd);
+    void LoadPipeline(HWND hWnd, bool useWarpDevice);
     void LoadAssets();
     void PopulateCommandList();
     void WaitForPreviousFrame();

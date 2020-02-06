@@ -70,24 +70,10 @@ static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft:
 }
 //////////////////////////////////////////////////////////////////////////////
 
-// Helper function for parsing any supplied command line args.
-_Use_decl_annotations_ void D3D12HelloTriangle::ParseCommandLineArgs(WCHAR *argv[], int argc)
-{
-    for (int i = 1; i < argc; ++i)
-    {
-        if (_wcsnicmp(argv[i], L"-warp", wcslen(argv[i])) == 0 ||
-            _wcsnicmp(argv[i], L"/warp", wcslen(argv[i])) == 0)
-        {
-            m_useWarpDevice = true;
-            m_title = m_title + L" (WARP)";
-        }
-    }
-}
+
 
 D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) : m_width(width),
                                                                                      m_height(height),
-                                                                                     m_title(name),
-                                                                                     m_useWarpDevice(false),
                                                                                      m_frameIndex(0),
                                                                                      m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
                                                                                      m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height)),
@@ -100,18 +86,18 @@ D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring nam
     m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 }
 
-void D3D12HelloTriangle::OnInit(HWND hWnd)
+void D3D12HelloTriangle::OnInit(HWND hWnd, bool useWarpDevice)
 {
-    LoadPipeline(hWnd);
+    LoadPipeline(hWnd, useWarpDevice);
     LoadAssets();
 }
 
 // Load the rendering pipeline dependencies.
-void D3D12HelloTriangle::LoadPipeline(HWND hWnd)
+void D3D12HelloTriangle::LoadPipeline(HWND hWnd, bool useWarpDevice)
 {
     auto factory = CreateFactory();
 
-    if (m_useWarpDevice)
+    if (useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
         ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));

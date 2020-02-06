@@ -1,8 +1,8 @@
 #pragma once
 
-struct Commandline
+struct CommandLine
 {
-    Commandline(int argc, char *argv[]);
+    CommandLine(int argc, char *argv[]);
 
     bool m_bDebugD3D12 = false;
     bool m_bVerbose = false;

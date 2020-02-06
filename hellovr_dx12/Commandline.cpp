@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Commandline::Commandline(int argc, char *argv[])
+CommandLine::CommandLine(int argc, char *argv[])
 {
     for (int i = 1; i < argc; i++)
     {

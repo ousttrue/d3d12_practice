@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-    Commandline cmdline(argc, argv);
+    CommandLine cmdline(argc, argv);
 
     CMainApplication pMainApplication(cmdline.m_nMSAASampleCount, cmdline.m_flSuperSampleScale);
 
