@@ -21,7 +21,6 @@ using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
 #include "DXSampleHelper.h"
-#include "Win32Application.h"
 
 class D3D12HelloTriangle
 {
@@ -74,7 +73,7 @@ class D3D12HelloTriangle
 public:
     D3D12HelloTriangle(UINT width, UINT height, std::wstring name);
 
-    virtual void OnInit();
+    virtual void OnInit(HWND hWnd);
     virtual void OnUpdate();
     virtual void OnRender();
     virtual void OnDestroy();
@@ -89,11 +88,9 @@ public:
     const WCHAR *GetTitle() const { return m_title.c_str(); }
 
     void ParseCommandLineArgs(_In_reads_(argc) WCHAR *argv[], int argc);
-    std::wstring GetAssetFullPath(LPCWSTR assetName);
-    void SetCustomWindowText(LPCWSTR text);
 
 private:
-    void LoadPipeline();
+    void LoadPipeline(HWND hWnd);
     void LoadAssets();
     void PopulateCommandList();
     void WaitForPreviousFrame();

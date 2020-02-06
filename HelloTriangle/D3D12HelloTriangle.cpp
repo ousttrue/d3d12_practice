@@ -69,18 +69,6 @@ static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft:
     return nullptr;
 }
 //////////////////////////////////////////////////////////////////////////////
-// Helper function for resolving the full path of assets.
-std::wstring D3D12HelloTriangle::GetAssetFullPath(LPCWSTR assetName)
-{
-    return m_assetsPath + assetName;
-}
-
-// Helper function for setting the window's title text.
-void D3D12HelloTriangle::SetCustomWindowText(LPCWSTR text)
-{
-    std::wstring windowText = m_title + L": " + text;
-    SetWindowText(Win32Application::GetHwnd(), windowText.c_str());
-}
 
 // Helper function for parsing any supplied command line args.
 _Use_decl_annotations_ void D3D12HelloTriangle::ParseCommandLineArgs(WCHAR *argv[], int argc)
@@ -112,14 +100,14 @@ D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring nam
     m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 }
 
-void D3D12HelloTriangle::OnInit()
+void D3D12HelloTriangle::OnInit(HWND hWnd)
 {
-    LoadPipeline();
+    LoadPipeline(hWnd);
     LoadAssets();
 }
 
 // Load the rendering pipeline dependencies.
-void D3D12HelloTriangle::LoadPipeline()
+void D3D12HelloTriangle::LoadPipeline(HWND hWnd)
 {
     auto factory = CreateFactory();
 
@@ -163,14 +151,14 @@ void D3D12HelloTriangle::LoadPipeline()
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
         m_commandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
-        Win32Application::GetHwnd(),
+        hWnd,
         &swapChainDesc,
         nullptr,
         nullptr,
         &swapChain));
 
     // This sample does not support fullscreen transitions.
-    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
+    ThrowIfFailed(factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER));
 
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
