@@ -1,5 +1,6 @@
-#include "stdafx.h"
 #include "D3D12HelloTriangle.h"
+#include <Windows.h>
+#include <string>
 
 // Main message handler for the sample.
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

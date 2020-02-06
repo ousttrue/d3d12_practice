@@ -9,7 +9,21 @@
 //
 //*********************************************************
 
-#include "stdafx.h"
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers.
+#endif
+
+#include <windows.h>
+
+#include <d3d12.h>
+#include <dxgi1_4.h>
+#include <D3Dcompiler.h>
+#include <DirectXMath.h>
+#include "d3dx12.h"
+
+#include <string>
+#include <wrl.h>
+#include <shellapi.h>
 #include "D3D12HelloTriangle.h"
 #include "DXSampleHelper.h"
 #include <DirectXMath.h>
@@ -91,8 +105,8 @@ class Impl
     float m_aspectRatio;
 
     // // Pipeline objects.
-    CD3DX12_VIEWPORT m_viewport;
-    CD3DX12_RECT m_scissorRect;
+    D3D12_VIEWPORT m_viewport = {0};
+    D3D12_RECT m_scissorRect = {0};
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
@@ -449,9 +463,9 @@ D3D12HelloTriangle::~D3D12HelloTriangle()
     delete m_impl;
 }
 
-void D3D12HelloTriangle::Render(HWND hWnd)
+void D3D12HelloTriangle::Render(void *hWnd)
 {
-    m_impl->Render(hWnd);
+    m_impl->Render((HWND)hWnd);
 }
 
 void D3D12HelloTriangle::SetSize(int w, int h)
