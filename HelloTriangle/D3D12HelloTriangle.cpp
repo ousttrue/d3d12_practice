@@ -7,7 +7,6 @@
 #include <windows.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
-#include "d3dx12.h"
 
 const std::string g_shaders =
 #include "shaders.hlsl"
@@ -29,7 +28,6 @@ class Impl
     Swapchain m_swapchain;
 
     bool m_useWarpDevice = false;
-    UINT m_frameCount;
 
     // Viewport dimensions.
     float m_aspectRatio = 1.0f;
@@ -39,14 +37,11 @@ class Impl
     D3D12_RECT m_scissorRect = {};
 
     ComPtr<ID3D12Device> m_device;
-    std::vector<ComPtr<ID3D12Resource>> m_renderTargets;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
-    UINT m_rtvDescriptorSize = 0;
 
     // // App resources.
     ComPtr<ID3D12Resource> m_vertexBuffer;
@@ -54,7 +49,7 @@ class Impl
 
 public:
     Impl(bool useWarpDevice, UINT frameCount)
-        : m_useWarpDevice(useWarpDevice), m_frameCount(frameCount)
+        : m_useWarpDevice(useWarpDevice), m_swapchain(frameCount)
     {
         m_viewport.MinDepth = D3D12_MIN_DEPTH;
         m_viewport.MaxDepth = D3D12_MAX_DEPTH;
@@ -91,7 +86,8 @@ public:
 
         if (!m_commandList)
         {
-            OnInit(hWnd);
+            LoadPipeline(hWnd);
+            LoadAssets();
         }
 
         // Record all the commands we need to render the scene into the command list.
@@ -126,10 +122,14 @@ private:
         m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
         // Indicate that the back buffer will be used as a render target.
-        m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[frameIndex].Get(),
-                                                                                D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        auto &rtv = m_swapchain.CurrentRTV();
+        m_commandList->ResourceBarrier(
+            1,
+            &CD3DX12_RESOURCE_BARRIER::Transition(rtv.Get(),
+                                                  D3D12_RESOURCE_STATE_PRESENT,
+                                                  D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), frameIndex, m_rtvDescriptorSize);
+        auto &rtvHandle = m_swapchain.CurrentHandle();
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         // Record commands.
@@ -140,19 +140,16 @@ private:
         m_commandList->DrawInstanced(3, 1, 0, 0);
 
         // Indicate that the back buffer will now be used to present.
-        m_commandList->ResourceBarrier(1,
-                                       &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+        m_commandList->ResourceBarrier(
+            1,
+            &CD3DX12_RESOURCE_BARRIER::Transition(rtv.Get(),
+                                                  D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                                  D3D12_RESOURCE_STATE_PRESENT));
 
         ThrowIfFailed(m_commandList->Close());
     }
 
 private:
-    void OnInit(HWND hWnd)
-    {
-        LoadPipeline(hWnd);
-        LoadAssets();
-    }
-
     void LoadPipeline(HWND hWnd)
     {
         auto factory = CreateFactory();
@@ -185,34 +182,9 @@ private:
 
         ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
-        m_swapchain.Initialize(factory, m_commandQueue, m_frameCount,
+        m_swapchain.Initialize(factory, m_commandQueue,
                                hWnd, (UINT)m_viewport.Width, (UINT)m_viewport.Height);
-
-        // Create descriptor heaps.
-        {
-            // Describe and create a render target view (RTV) descriptor heap.
-            D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-            rtvHeapDesc.NumDescriptors = m_frameCount;
-            rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-            rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-            ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
-
-            m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        }
-
-        // Create frame resources.
-        {
-            CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-            // Create a RTV for each frame.
-            for (UINT n = 0; n < m_frameCount; n++)
-            {
-                auto resource = m_swapchain.GetResource(n);
-                m_device->CreateRenderTargetView(resource.Get(), nullptr, rtvHandle);
-                rtvHandle.Offset(1, m_rtvDescriptorSize);
-                m_renderTargets.push_back(resource);
-            }
-        }
+        m_swapchain.CreateRenderTargets(m_device);
 
         ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
     }

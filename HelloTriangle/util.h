@@ -1,9 +1,11 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <stdexcept>
 #include <wrl/client.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include "d3dx12.h"
 
 template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -130,9 +132,14 @@ class Swapchain
 {
     ComPtr<IDXGISwapChain3> m_swapChain;
     UINT m_frameIndex = 0;
+    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    UINT m_rtvDescriptorSize = 0;
+    std::vector<ComPtr<ID3D12Resource>> m_renderTargets;
+    UINT m_frameCount;
 
 public:
-    Swapchain()
+    Swapchain(UINT frameCount)
+    : m_frameCount(frameCount)
     {
     }
     ~Swapchain()
@@ -141,7 +148,6 @@ public:
 
     void Initialize(const ComPtr<IDXGIFactory4> &factory,
                     const ComPtr<ID3D12CommandQueue> &queue,
-                    UINT frameCount,
                     HWND hWnd, UINT width, UINT height)
     {
         // Describe and create the swap chain.
@@ -153,7 +159,7 @@ public:
                 .Count = 1,
             },
             .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
-            .BufferCount = frameCount,
+            .BufferCount = m_frameCount,
             .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
         };
 
@@ -173,6 +179,36 @@ public:
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
     }
 
+    void CreateRenderTargets(const ComPtr<ID3D12Device> &device)
+    {
+        // Create descriptor heaps.
+        {
+            // Describe and create a render target view (RTV) descriptor heap.
+            D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{
+                .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+                .NumDescriptors = m_frameCount,
+                .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+            };
+            ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+
+            m_rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        }
+
+        // Create frame resources.
+        {
+            CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+            // Create a RTV for each frame.
+            for (UINT n = 0; n < m_frameCount; n++)
+            {
+                auto resource = GetResource(n);
+                device->CreateRenderTargetView(resource.Get(), nullptr, rtvHandle);
+                rtvHandle.Offset(1, m_rtvDescriptorSize);
+                m_renderTargets.push_back(resource);
+            }
+        }
+    }
+
     void Present()
     {
         ThrowIfFailed(m_swapChain->Present(1, 0));
@@ -186,6 +222,19 @@ public:
     UINT FrameIndex() const
     {
         return m_frameIndex;
+    }
+
+    const ComPtr<ID3D12Resource> &CurrentRTV() const
+    {
+        return m_renderTargets[m_frameIndex];
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE m_handle;
+    const D3D12_CPU_DESCRIPTOR_HANDLE &CurrentHandle()
+    {
+        auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+        m_handle = handle;
+        return m_handle;
     }
 
     ComPtr<ID3D12Resource> GetResource(int n)
