@@ -103,8 +103,8 @@ class Impl
     float m_aspectRatio = 1.0f;
 
     // // Pipeline objects.
-    D3D12_VIEWPORT m_viewport = {0};
-    D3D12_RECT m_scissorRect = {0};
+    D3D12_VIEWPORT m_viewport = {};
+    D3D12_RECT m_scissorRect = {};
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
@@ -277,21 +277,25 @@ private:
         }
 
         // Describe and create the command queue.
-        D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-        queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-        queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        D3D12_COMMAND_QUEUE_DESC queueDesc = {
+            .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
+            .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+        };
 
         ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
         // Describe and create the swap chain.
-        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-        swapChainDesc.BufferCount = FrameCount;
-        swapChainDesc.Width = (UINT)m_viewport.Width;
-        swapChainDesc.Height = (UINT)m_viewport.Height;
-        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapChainDesc.SampleDesc.Count = 1;
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {
+            .Width = (UINT)m_viewport.Width,
+            .Height = (UINT)m_viewport.Height,
+            .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+            .SampleDesc = {
+                .Count = 1,
+            },
+            .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            .BufferCount = FrameCount,
+            .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+        };
 
         ComPtr<IDXGISwapChain1> swapChain;
         ThrowIfFailed(factory->CreateSwapChainForHwnd(
@@ -337,7 +341,8 @@ private:
     }
 
     // Load the sample assets.
-    void LoadAssets()
+    void
+    LoadAssets()
     {
         // Create an empty root signature.
         {
