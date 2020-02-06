@@ -21,15 +21,17 @@
 #include <DirectXMath.h>
 #include <wrl.h>
 #include <string>
+#include <stdexcept>
 #include <shellapi.h>
 #include "d3dx12.h"
-#include "DXSampleHelper.h"
 
 const std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
 using namespace DirectX;
+template <class T>
+using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 const UINT FrameCount = 2;
 
@@ -40,6 +42,31 @@ struct Vertex
 };
 
 //////////////////////////////////////////////////////////////////////////////
+inline std::string HrToString(HRESULT hr)
+{
+    char s_str[64] = {};
+    sprintf_s(s_str, "HRESULT of 0x%08X", static_cast<UINT>(hr));
+    return std::string(s_str);
+}
+
+class HrException : public std::runtime_error
+{
+public:
+    HrException(HRESULT hr) : std::runtime_error(HrToString(hr)), m_hr(hr) {}
+    HRESULT Error() const { return m_hr; }
+
+private:
+    const HRESULT m_hr;
+};
+
+static void ThrowIfFailed(HRESULT hr)
+{
+    if (FAILED(hr))
+    {
+        throw HrException(hr);
+    }
+}
+
 static Microsoft::WRL::ComPtr<IDXGIFactory4> CreateFactory()
 {
     UINT dxgiFactoryFlags = 0;
