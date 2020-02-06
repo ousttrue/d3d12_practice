@@ -13,21 +13,17 @@
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers.
 #endif
 
+#include "D3D12HelloTriangle.h"
 #include <windows.h>
-
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
-#include "d3dx12.h"
-
-#include <string>
 #include <wrl.h>
+#include <string>
 #include <shellapi.h>
-#include "D3D12HelloTriangle.h"
+#include "d3dx12.h"
 #include "DXSampleHelper.h"
-#include <DirectXMath.h>
-#include <wrl/client.h>
 
 const std::string g_shaders =
 #include "shaders.hlsl"
@@ -96,8 +92,51 @@ static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft:
     return nullptr;
 }
 //////////////////////////////////////////////////////////////////////////////
+class Fence
+{
+    HANDLE m_fenceEvent = NULL;
+    ComPtr<ID3D12Fence> m_fence;
+    UINT64 m_fenceValue = 1;
+
+public:
+    Fence()
+    {
+    }
+    ~Fence()
+    {
+        CloseHandle(m_fenceEvent);
+    }
+
+    void Initialize(const ComPtr<ID3D12Device> &device)
+    {
+        ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+        // Create an event handle to use for frame synchronization.
+        m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        if (m_fenceEvent == nullptr)
+        {
+            ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+        }
+    }
+
+    void Wait(const ComPtr<ID3D12CommandQueue> queue)
+    {
+        // Signal and increment the fence value.
+        const UINT64 fence = m_fenceValue++;
+        ThrowIfFailed(queue->Signal(m_fence.Get(), fence));
+
+        // Wait until the previous frame is finished.
+        if (m_fence->GetCompletedValue() < fence)
+        {
+            ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
+            WaitForSingleObject(m_fenceEvent, INFINITE);
+        }
+    }
+};
+
 class Impl
 {
+    Fence m_fence;
+
     bool m_useWarpDevice = false;
     // Viewport dimensions.
     float m_aspectRatio = 1.0f;
@@ -122,9 +161,6 @@ class Impl
 
     // // Synchronization objects.
     UINT m_frameIndex = 0;
-    HANDLE m_fenceEvent = NULL;
-    ComPtr<ID3D12Fence> m_fence;
-    UINT64 m_fenceValue;
 
 public:
     Impl(bool useWarpDevice)
@@ -138,8 +174,7 @@ public:
     {
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
-        WaitForPreviousFrame();
-        CloseHandle(m_fenceEvent);
+        m_fence.Wait(m_commandQueue);
     }
 
     void SetSize(int w, int h)
@@ -179,7 +214,8 @@ public:
         // Present the frame.
         ThrowIfFailed(m_swapChain->Present(1, 0));
 
-        WaitForPreviousFrame();
+        m_fence.Wait(m_commandQueue);
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
     }
 
 private:
@@ -220,27 +256,15 @@ private:
         ThrowIfFailed(m_commandList->Close());
     }
 
-    void WaitForPreviousFrame()
-    {
-        // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-        // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-        // sample illustrates how to use fences for efficient resource usage and to
-        // maximize GPU utilization.
+    // void WaitForPreviousFrame()
+    // {
+    //     // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
+    //     // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
+    //     // sample illustrates how to use fences for efficient resource usage and to
+    //     // maximize GPU utilization.
 
-        // Signal and increment the fence value.
-        const UINT64 fence = m_fenceValue;
-        ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
-        m_fenceValue++;
-
-        // Wait until the previous frame is finished.
-        if (m_fence->GetCompletedValue() < fence)
-        {
-            ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
-            WaitForSingleObject(m_fenceEvent, INFINITE);
-        }
-
-        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    }
+    //     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+    // }
 
 private:
     // D3D12HelloTriangle(UINT width, UINT height, std::wstring name);
@@ -440,22 +464,7 @@ private:
         }
 
         // Create synchronization objects and wait until assets have been uploaded to the GPU.
-        {
-            ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-            m_fenceValue = 1;
-
-            // Create an event handle to use for frame synchronization.
-            m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-            if (m_fenceEvent == nullptr)
-            {
-                ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-            }
-
-            // Wait for the command list to execute; we are reusing the same command
-            // list in our main loop but for now, we just want to wait for setup to
-            // complete before continuing.
-            WaitForPreviousFrame();
-        }
+        m_fence.Initialize(m_device);
     }
 };
 
