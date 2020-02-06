@@ -2,7 +2,6 @@ set(TARGET_NAME HelloTriangle)
 add_executable(${TARGET_NAME} WIN32
     Main.cpp
     Win32Application.cpp
-    DXSample.cpp
     D3D12HelloTriangle.cpp
     )
 target_compile_definitions(${TARGET_NAME} PRIVATE
