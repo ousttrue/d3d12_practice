@@ -98,11 +98,9 @@ static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft:
 //////////////////////////////////////////////////////////////////////////////
 class Impl
 {
-    bool m_useWarpDevice;
+    bool m_useWarpDevice = false;
     // Viewport dimensions.
-    UINT m_width = 0;
-    UINT m_height = 0;
-    float m_aspectRatio;
+    float m_aspectRatio = 1.0f;
 
     // // Pipeline objects.
     D3D12_VIEWPORT m_viewport = {0};
@@ -132,6 +130,8 @@ public:
     Impl(bool useWarpDevice)
         : m_useWarpDevice(useWarpDevice)
     {
+        m_viewport.MinDepth = D3D12_MIN_DEPTH;
+        m_viewport.MaxDepth = D3D12_MAX_DEPTH;
     }
 
     ~Impl()
@@ -144,21 +144,22 @@ public:
 
     void SetSize(int w, int h)
     {
-        if (w == m_width && h == m_height)
+        if (w == m_viewport.Width && h == m_viewport.Height)
         {
             auto a = 0;
             return;
         }
-        m_width = w;
-        m_height = h;
+        m_viewport.Width = static_cast<float>(w);
+        m_viewport.Height = static_cast<float>(h);
         m_aspectRatio = static_cast<float>(w) / static_cast<float>(h);
-        m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h));
-        m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(w), static_cast<LONG>(h));
+
+        m_scissorRect.right = static_cast<LONG>(w);
+        m_scissorRect.bottom = static_cast<LONG>(h);
     }
 
     void Render(HWND hWnd)
     {
-        if (m_width == 0 || m_height == 0)
+        if (m_viewport.Width == 0 || m_viewport.Height == 0)
         {
             return;
         }
@@ -285,8 +286,8 @@ private:
         // Describe and create the swap chain.
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
         swapChainDesc.BufferCount = FrameCount;
-        swapChainDesc.Width = m_width;
-        swapChainDesc.Height = m_height;
+        swapChainDesc.Width = (UINT)m_viewport.Width;
+        swapChainDesc.Height = (UINT)m_viewport.Height;
         swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
