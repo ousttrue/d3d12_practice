@@ -9,8 +9,16 @@ class CommandBuilder
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12RootSignature> m_rootSignature;
 
+    // Viewport dimensions.
+    D3D12_VIEWPORT m_viewport = {
+        .MinDepth = D3D12_MIN_DEPTH,
+        .MaxDepth = D3D12_MAX_DEPTH,
+    };
+    float m_aspectRatio = 1.0f;
+    D3D12_RECT m_scissorRect{};
+
 public:
-    void Initialize(const ComPtr<ID3D12Device> &device, float aspectRatio)
+    void Initialize(const ComPtr<ID3D12Device> &device)
     {
         // Create an empty root signature.
         {
@@ -73,11 +81,25 @@ public:
         // to record yet. The main loop expects it to be closed, so close it now.
         ThrowIfFailed(m_commandList->Close());
 
-        m_scene.Initialize(device, aspectRatio);
+        m_scene.Initialize(device, m_aspectRatio);
+    }
+
+    void SetSize(int w, int h)
+    {
+        if (w == m_viewport.Width && h == m_viewport.Height)
+        {
+            auto a = 0;
+            return;
+        }
+        m_viewport.Width = static_cast<float>(w);
+        m_viewport.Height = static_cast<float>(h);
+        m_aspectRatio = static_cast<float>(w) / static_cast<float>(h);
+
+        m_scissorRect.right = static_cast<LONG>(w);
+        m_scissorRect.bottom = static_cast<LONG>(h);
     }
 
     ComPtr<ID3D12CommandList> PopulateCommandList(
-        const D3D12_VIEWPORT &viewport, const D3D12_RECT &scissorRect,
         const ComPtr<ID3D12Resource> &rtv, const D3D12_CPU_DESCRIPTOR_HANDLE &rtvHandle)
     {
         // auto frameIndex = m_swapchain.FrameIndex();
@@ -94,8 +116,8 @@ public:
 
         // Set necessary state.
         m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-        m_commandList->RSSetViewports(1, &viewport);
-        m_commandList->RSSetScissorRects(1, &scissorRect);
+        m_commandList->RSSetViewports(1, &m_viewport);
+        m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
         // Indicate that the back buffer will be used as a render target.
         // auto &rtv = m_swapchain.CurrentRTV();

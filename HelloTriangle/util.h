@@ -137,6 +137,8 @@ class Swapchain
     std::vector<ComPtr<ID3D12Resource>> m_renderTargets;
     UINT m_frameCount;
 
+    // // Pipeline objects.
+
 public:
     Swapchain(UINT frameCount)
         : m_frameCount(frameCount)
@@ -148,12 +150,12 @@ public:
 
     void Initialize(const ComPtr<IDXGIFactory4> &factory,
                     const ComPtr<ID3D12CommandQueue> &queue,
-                    HWND hWnd, UINT width, UINT height)
+                    HWND hWnd, UINT w, UINT h)
     {
         // Describe and create the swap chain.
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {
-            .Width = width,
-            .Height = height,
+            .Width = w,
+            .Height = h,
             .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
             .SampleDesc = {
                 .Count = 1,
@@ -212,8 +214,10 @@ public:
     void Present()
     {
         ThrowIfFailed(m_swapChain->Present(1, 0));
+        UpdateFrameIndex();
     }
 
+private:
     void UpdateFrameIndex()
     {
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
@@ -224,6 +228,7 @@ public:
         return m_frameIndex;
     }
 
+public:
     const ComPtr<ID3D12Resource> &CurrentRTV() const
     {
         return m_renderTargets[m_frameIndex];
@@ -237,6 +242,7 @@ public:
         return m_handle;
     }
 
+private:
     ComPtr<ID3D12Resource> GetResource(int n)
     {
         ComPtr<ID3D12Resource> resource;
