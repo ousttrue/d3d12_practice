@@ -74,19 +74,11 @@ public:
             return;
         }
 
-        if (!m_commandList)
-        {
-            LoadPipeline(hWnd);
-            LoadAssets();
-            m_scene.Initialize(m_device, m_aspectRatio);
-        }
-
         // Record all the commands we need to render the scene into the command list.
-        PopulateCommandList(m_swapchain.FrameIndex());
+        auto commandList = PopulateCommandList(hWnd);
 
         // Execute the command list.
-        ID3D12CommandList *ppCommandLists[] = {m_commandList.Get()};
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
 
         // Present the frame.
         m_swapchain.Present();
@@ -95,8 +87,17 @@ public:
     }
 
 private:
-    void PopulateCommandList(UINT frameIndex)
+    ComPtr<ID3D12CommandList> PopulateCommandList(HWND hWnd)
     {
+        if (!m_commandList)
+        {
+            Initialize(hWnd);
+            LoadAssets();
+            m_scene.Initialize(m_device, m_aspectRatio);
+        }
+
+        auto frameIndex = m_swapchain.FrameIndex();
+
         // Command list allocators can only be reset when the associated
         // command lists have finished execution on the GPU; apps should use
         // fences to determine GPU execution progress.
@@ -137,10 +138,12 @@ private:
                                                   D3D12_RESOURCE_STATE_PRESENT));
 
         ThrowIfFailed(m_commandList->Close());
+
+        return m_commandList;
     }
 
 private:
-    void LoadPipeline(HWND hWnd)
+    void Initialize(HWND hWnd)
     {
         auto factory = CreateFactory();
 
