@@ -81,7 +81,7 @@ public:
         // to record yet. The main loop expects it to be closed, so close it now.
         ThrowIfFailed(m_commandList->Close());
 
-        m_scene.Initialize(device, m_aspectRatio);
+        m_scene.Initialize(device);
     }
 
     void SetSize(int w, int h)
