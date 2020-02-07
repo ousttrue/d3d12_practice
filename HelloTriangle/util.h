@@ -139,7 +139,7 @@ class Swapchain
 
 public:
     Swapchain(UINT frameCount)
-    : m_frameCount(frameCount)
+        : m_frameCount(frameCount)
     {
     }
     ~Swapchain()
