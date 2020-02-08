@@ -303,7 +303,10 @@ void CMainApplication::ProcessVREvent(const vr::VREvent_t &event, const ComPtr<I
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// 1. Render LeftEye to LeftRTV
+// 2. Render RighttEye to RightRTV
+// 3. Render LeftRTV and RightRTV to CompanionWindow(Swapchain)
+// 4. Submit to OpenVR
 //-----------------------------------------------------------------------------
 void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv)
 {
@@ -314,8 +317,66 @@ void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCom
 
         m_axis->UpdateControllerAxes(m_hmd, m_d3d->Device());
 
-        RenderStereoTargets(pCommandList);
-        RenderCompanionWindow(pCommandList, rtv);
+        {
+            ////////////////
+            // RENDER
+            ////////////////
+            D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nRenderWidth, (FLOAT)m_nRenderHeight, 0.0f, 1.0f};
+            D3D12_RECT scissor = {0, 0, (LONG)m_nRenderWidth, (LONG)m_nRenderHeight};
+
+            pCommandList->RSSetViewports(1, &viewport);
+            pCommandList->RSSetScissorRects(1, &scissor);
+
+            //----------//
+            // Left Eye //
+            //----------//
+            m_companionWindow->BeginLeft(pCommandList);
+            RenderScene(vr::Eye_Left, pCommandList);
+            m_companionWindow->EndLeft(pCommandList);
+
+            //-----------//
+            // Right Eye //
+            //-----------//
+            m_companionWindow->BeginRight(pCommandList);
+            RenderScene(vr::Eye_Right, pCommandList);
+            m_companionWindow->EndRight(pCommandList);
+        }
+
+        {
+            pCommandList->SetPipelineState(m_pCompanionPipelineState.Get());
+
+            // Transition swapchain image to RENDER_TARGET
+            pCommandList->ResourceBarrier(
+                1, &CD3DX12_RESOURCE_BARRIER::Transition(
+                       rtv.Get(),
+                       D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+            // Bind current swapchain image
+            auto rtvHandle = m_d3d->RTVHandleCurrent();
+            pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
+
+            auto w = m_sdl->Width();
+            auto h = m_sdl->Height();
+            D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)w, (FLOAT)h, 0.0f, 1.0f};
+            D3D12_RECT scissor = {0, 0, (LONG)w, (LONG)h};
+
+            pCommandList->RSSetViewports(1, &viewport);
+            pCommandList->RSSetScissorRects(1, &scissor);
+
+            // render left eye (first half of index array)
+            auto srvHandleLeftEye = m_cbv->GpuHandle(SRV_LEFT_EYE);
+
+            // render right eye (second half of index array)
+            auto srvHandleRightEye = m_cbv->GpuHandle(SRV_RIGHT_EYE);
+
+            m_companionWindow->Draw(pCommandList, srvHandleLeftEye, srvHandleRightEye);
+
+            // Transition swapchain image to PRESENT
+            pCommandList->ResourceBarrier(
+                1, &CD3DX12_RESOURCE_BARRIER::Transition(
+                       rtv.Get(),
+                       D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+        }
 
         pCommandList->Close();
 
@@ -711,32 +772,6 @@ bool CMainApplication::SetupStereoRenderTargets()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-void CMainApplication::RenderStereoTargets(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
-{
-    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nRenderWidth, (FLOAT)m_nRenderHeight, 0.0f, 1.0f};
-    D3D12_RECT scissor = {0, 0, (LONG)m_nRenderWidth, (LONG)m_nRenderHeight};
-
-    pCommandList->RSSetViewports(1, &viewport);
-    pCommandList->RSSetScissorRects(1, &scissor);
-
-    //----------//
-    // Left Eye //
-    //----------//
-    m_companionWindow->BeginLeft(pCommandList);
-    RenderScene(vr::Eye_Left, pCommandList);
-    m_companionWindow->EndLeft(pCommandList);
-
-    //-----------//
-    // Right Eye //
-    //-----------//
-    m_companionWindow->BeginRight(pCommandList);
-    RenderScene(vr::Eye_Right, pCommandList);
-    m_companionWindow->EndRight(pCommandList);
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: Renders a scene with respect to nEye.
 //-----------------------------------------------------------------------------
 void CMainApplication::RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
@@ -787,44 +822,4 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12Graphics
 
         m_models->Draw(pCommandList, nEye, unTrackedDevice, matMVP);
     }
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-void CMainApplication::RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &swapchainRTV)
-{
-    pCommandList->SetPipelineState(m_pCompanionPipelineState.Get());
-
-    // Transition swapchain image to RENDER_TARGET
-    pCommandList->ResourceBarrier(
-        1, &CD3DX12_RESOURCE_BARRIER::Transition(
-               swapchainRTV.Get(),
-               D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-    // Bind current swapchain image
-    auto rtvHandle = m_d3d->RTVHandleCurrent();
-    pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
-
-    auto w = m_sdl->Width();
-    auto h = m_sdl->Height();
-    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)w, (FLOAT)h, 0.0f, 1.0f};
-    D3D12_RECT scissor = {0, 0, (LONG)w, (LONG)h};
-
-    pCommandList->RSSetViewports(1, &viewport);
-    pCommandList->RSSetScissorRects(1, &scissor);
-
-    // render left eye (first half of index array)
-    auto srvHandleLeftEye = m_cbv->GpuHandle(SRV_LEFT_EYE);
-
-    // render right eye (second half of index array)
-    auto srvHandleRightEye = m_cbv->GpuHandle(SRV_RIGHT_EYE);
-
-    m_companionWindow->Draw(pCommandList, srvHandleLeftEye, srvHandleRightEye);
-
-    // Transition swapchain image to PRESENT
-    pCommandList->ResourceBarrier(
-        1, &CD3DX12_RESOURCE_BARRIER::Transition(
-               swapchainRTV.Get(),
-               D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 }
