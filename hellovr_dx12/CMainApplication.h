@@ -35,8 +35,6 @@ enum CBVSRVIndex_t
     NUM_SRV_CBVS
 };
 
-
-
 class CMainApplication
 {
     class HMD *m_hmd = nullptr;
@@ -56,9 +54,9 @@ public:
     void SetupRenderModels(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 
     void RunMainLoop();
-    bool HandleInput();
-    void ProcessVREvent(const vr::VREvent_t &event);
-    void RenderFrame();
+    bool HandleInput(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
+    void ProcessVREvent(const vr::VREvent_t &event, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
+    void RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv);
 
     bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     static void GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcWidth, int nSrcHeight, int *pDstWidthOut, int *pDstHeightOut);
@@ -72,9 +70,9 @@ public:
     bool SetupStereoRenderTargets();
     void SetupCompanionWindow();
 
-    void RenderStereoTargets();
-    void RenderCompanionWindow();
-    void RenderScene(vr::Hmd_Eye nEye);
+    void RenderStereoTargets(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
+    void RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &swapchainRTV);
+    void RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     bool CreateAllShaders();
     void SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
@@ -93,7 +91,7 @@ private:
     int m_iValidPoseCount_Last;
     bool m_bShowCubes;
 
-    std::string m_strPoseClasses;                        // what classes we saw poses for this frame
+    std::string m_strPoseClasses; // what classes we saw poses for this frame
 
     int m_iSceneVolumeWidth;
     int m_iSceneVolumeHeight;
@@ -101,15 +99,12 @@ private:
     float m_fScaleSpacing;
     float m_fScale;
 
-
     unsigned int m_uiVertcount;
     unsigned int m_uiCompanionWindowIndexSize;
 
     // D3D12 members
     static const int g_nFrameCount = 2; // Swapchain depth
-    ComPtr<ID3D12Resource> m_pSwapChainRenderTarget[g_nFrameCount];
-    ComPtr<ID3D12CommandAllocator> m_pCommandAllocators[g_nFrameCount];
-    ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
+
     ComPtr<ID3D12DescriptorHeap> m_pCBVSRVHeap;
     ComPtr<ID3D12DescriptorHeap> m_pRTVHeap;
     ComPtr<ID3D12DescriptorHeap> m_pDSVHeap;

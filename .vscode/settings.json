@@ -1,7 +1,8 @@
 {
     "files.associations": {
         "*.uss": "css",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "vector": "cpp"
     },
     "cSpell.words": [
         "DCOMPILE",

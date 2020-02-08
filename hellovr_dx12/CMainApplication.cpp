@@ -151,24 +151,6 @@ bool CMainApplication::BInitD3D12()
 		m_pDevice->CreateDescriptorHeap(&cbvSrvHeapDesc, IID_PPV_ARGS(&m_pCBVSRVHeap));
 	}
 
-	// Create per-frame resources
-	for (int nFrame = 0; nFrame < g_nFrameCount; nFrame++)
-	{
-		if (FAILED(m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_pCommandAllocators[nFrame]))))
-		{
-			dprintf("Failed to create command allocators.\n");
-			return false;
-		}
-
-		// Create swapchain render targets
-		m_d3d->Swapchain()->GetBuffer(nFrame, IID_PPV_ARGS(&m_pSwapChainRenderTarget[nFrame]));
-
-		// Create swapchain render target views
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
-		rtvHandle.Offset(RTV_SWAPCHAIN0 + nFrame, m_nRTVDescriptorSize);
-		m_pDevice->CreateRenderTargetView(m_pSwapChainRenderTarget[nFrame].Get(), nullptr, rtvHandle);
-	}
-
 	// Create constant buffer
 	{
 		m_pDevice->CreateCommittedResource(
@@ -261,7 +243,7 @@ bool CMainApplication::BInitCompositor()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-bool CMainApplication::HandleInput()
+bool CMainApplication::HandleInput(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	bool bRet = m_sdl->HandleInput(&m_bShowCubes);
 
@@ -269,7 +251,7 @@ bool CMainApplication::HandleInput()
 	vr::VREvent_t event;
 	while (m_hmd->Hmd()->PollNextEvent(&event, sizeof(event)))
 	{
-		ProcessVREvent(event);
+		ProcessVREvent(event, pCommandList);
 	}
 
 	// Process SteamVR controller state
@@ -281,33 +263,60 @@ bool CMainApplication::HandleInput()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
+// D3D12 members
+struct FrameResource
+{
+	ComPtr<ID3D12Resource> m_pSwapChainRenderTarget;
+	ComPtr<ID3D12CommandAllocator> m_pCommandAllocator;
+	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
+};
 void CMainApplication::RunMainLoop()
 {
-	ComPtr<ID3D12GraphicsCommandList> pCommandList;
-	m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-									   m_pCommandAllocators[m_d3d->FrameIndex()].Get(),
-									   m_pScenePipelineState.Get(),
-									   IID_PPV_ARGS(&m_pCommandList));
+	FrameResource frames[g_nFrameCount];
+	for (int nFrame = 0; nFrame < g_nFrameCount; nFrame++)
+	{
+		// Create per-frame resources
+		auto &frame = frames[nFrame];
+		if (FAILED(m_d3d->Device()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frame.m_pCommandAllocator))))
+		{
+			dprintf("Failed to create command allocators.\n");
+			return;
+		}
+
+		// Create swapchain render targets
+		m_d3d->Swapchain()->GetBuffer(nFrame, IID_PPV_ARGS(&frame.m_pSwapChainRenderTarget));
+
+		// Create swapchain render target views
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
+		rtvHandle.Offset(RTV_SWAPCHAIN0 + nFrame, m_nRTVDescriptorSize);
+		m_d3d->Device()->CreateRenderTargetView(frame.m_pSwapChainRenderTarget.Get(), nullptr, rtvHandle);
+		m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+										   frame.m_pCommandAllocator.Get(),
+										   m_pScenePipelineState.Get(),
+										   IID_PPV_ARGS(&frame.m_pCommandList));
+	}
 
 	bool bQuit = false;
 	while (!bQuit)
 	{
-		bQuit = HandleInput();
-
-		RenderFrame();
+		auto &frame = frames[m_d3d->FrameIndex()];
+		bQuit = HandleInput(frame.m_pCommandList);
+		frame.m_pCommandAllocator->Reset();
+		frame.m_pCommandList->Reset(frame.m_pCommandAllocator.Get(), m_pScenePipelineState.Get());
+		RenderFrame(frame.m_pCommandList, frame.m_pSwapChainRenderTarget);
 	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Processes a single VR event
 //-----------------------------------------------------------------------------
-void CMainApplication::ProcessVREvent(const vr::VREvent_t &event)
+void CMainApplication::ProcessVREvent(const vr::VREvent_t &event, const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	switch (event.eventType)
 	{
 	case vr::VREvent_TrackedDeviceActivated:
 	{
-		SetupRenderModelForTrackedDevice(event.trackedDeviceIndex, m_pCommandList);
+		SetupRenderModelForTrackedDevice(event.trackedDeviceIndex, pCommandList);
 		dprintf("Device %u attached. Setting up render model.\n", event.trackedDeviceIndex);
 	}
 	break;
@@ -327,26 +336,21 @@ void CMainApplication::ProcessVREvent(const vr::VREvent_t &event)
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CMainApplication::RenderFrame()
+void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv)
 {
 	if (m_hmd->Hmd())
 	{
-		m_pCommandAllocators[m_d3d->FrameIndex()]->Reset();
-
-		m_pCommandList->Reset(m_pCommandAllocators[m_d3d->FrameIndex()].Get(), m_pScenePipelineState.Get());
-		m_pCommandList->SetGraphicsRootSignature(m_pRootSignature.Get());
-
-		ID3D12DescriptorHeap *ppHeaps[] = {m_pCBVSRVHeap.Get()};
-		m_pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+		pCommandList->SetGraphicsRootSignature(m_pRootSignature.Get());
+		pCommandList->SetDescriptorHeaps(1, m_pCBVSRVHeap.GetAddressOf());
 
 		UpdateControllerAxes();
-		RenderStereoTargets();
-		RenderCompanionWindow();
+		RenderStereoTargets(pCommandList);
+		RenderCompanionWindow(pCommandList, rtv);
 
-		m_pCommandList->Close();
+		pCommandList->Close();
 
 		// Execute the command list.
-		m_d3d->Execute(m_pCommandList);
+		m_d3d->Execute(pCommandList);
 
 		vr::VRTextureBounds_t bounds;
 		bounds.uMin = 0.0f;
@@ -1145,72 +1149,72 @@ void CMainApplication::SetupCompanionWindow()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CMainApplication::RenderStereoTargets()
+void CMainApplication::RenderStereoTargets(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nRenderWidth, (FLOAT)m_nRenderHeight, 0.0f, 1.0f};
 	D3D12_RECT scissor = {0, 0, (LONG)m_nRenderWidth, (LONG)m_nRenderHeight};
 
-	m_pCommandList->RSSetViewports(1, &viewport);
-	m_pCommandList->RSSetScissorRects(1, &scissor);
+	pCommandList->RSSetViewports(1, &viewport);
+	pCommandList->RSSetScissorRects(1, &scissor);
 
 	//----------//
 	// Left Eye //
 	//----------//
 	// Transition to RENDER_TARGET
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
-	m_pCommandList->OMSetRenderTargets(1, &m_leftEyeDesc.m_renderTargetViewHandle, FALSE, &m_leftEyeDesc.m_depthStencilViewHandle);
+	pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	pCommandList->OMSetRenderTargets(1, &m_leftEyeDesc.m_renderTargetViewHandle, FALSE, &m_leftEyeDesc.m_depthStencilViewHandle);
 
 	const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-	m_pCommandList->ClearRenderTargetView(m_leftEyeDesc.m_renderTargetViewHandle, clearColor, 0, nullptr);
-	m_pCommandList->ClearDepthStencilView(m_leftEyeDesc.m_depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
+	pCommandList->ClearRenderTargetView(m_leftEyeDesc.m_renderTargetViewHandle, clearColor, 0, nullptr);
+	pCommandList->ClearDepthStencilView(m_leftEyeDesc.m_depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
 
-	RenderScene(vr::Eye_Left);
+	RenderScene(vr::Eye_Left, pCommandList);
 
 	// Transition to SHADER_RESOURCE to submit to SteamVR
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+	pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 	//-----------//
 	// Right Eye //
 	//-----------//
 	// Transition to RENDER_TARGET
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
-	m_pCommandList->OMSetRenderTargets(1, &m_rightEyeDesc.m_renderTargetViewHandle, FALSE, &m_rightEyeDesc.m_depthStencilViewHandle);
+	pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	pCommandList->OMSetRenderTargets(1, &m_rightEyeDesc.m_renderTargetViewHandle, FALSE, &m_rightEyeDesc.m_depthStencilViewHandle);
 
-	m_pCommandList->ClearRenderTargetView(m_rightEyeDesc.m_renderTargetViewHandle, clearColor, 0, nullptr);
-	m_pCommandList->ClearDepthStencilView(m_rightEyeDesc.m_depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
+	pCommandList->ClearRenderTargetView(m_rightEyeDesc.m_renderTargetViewHandle, clearColor, 0, nullptr);
+	pCommandList->ClearDepthStencilView(m_rightEyeDesc.m_depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
 
-	RenderScene(vr::Eye_Right);
+	RenderScene(vr::Eye_Right, pCommandList);
 
 	// Transition to SHADER_RESOURCE to submit to SteamVR
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+	pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Renders a scene with respect to nEye.
 //-----------------------------------------------------------------------------
-void CMainApplication::RenderScene(vr::Hmd_Eye nEye)
+void CMainApplication::RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	if (m_bShowCubes)
 	{
-		m_pCommandList->SetPipelineState(m_pScenePipelineState.Get());
+		pCommandList->SetPipelineState(m_pScenePipelineState.Get());
 
 		// Select the CBV (left or right eye)
 		CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
 		cbvHandle.Offset(nEye, m_nCBVSRVDescriptorSize);
-		m_pCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+		pCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
 
 		// SRV is just after the left eye
 		CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
 		srvHandle.Offset(SRV_TEXTURE_MAP, m_nCBVSRVDescriptorSize);
-		m_pCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
+		pCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
 
 		// Update the persistently mapped pointer to the CB data with the latest matrix
 		memcpy(m_pSceneConstantBufferData[nEye], m_hmd->GetCurrentViewProjectionMatrix(nEye).get(), sizeof(Matrix4));
 
 		// Draw
-		m_pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_pCommandList->IASetVertexBuffers(0, 1, &m_sceneVertexBufferView);
-		m_pCommandList->DrawInstanced(m_uiVertcount, 1, 0, 0);
+		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		pCommandList->IASetVertexBuffers(0, 1, &m_sceneVertexBufferView);
+		pCommandList->DrawInstanced(m_uiVertcount, 1, 0, 0);
 	}
 
 	bool bIsInputAvailable = m_hmd->Hmd()->IsInputAvailable();
@@ -1218,15 +1222,15 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye)
 	if (bIsInputAvailable && m_pControllerAxisVertexBuffer)
 	{
 		// draw the controller axis lines
-		m_pCommandList->SetPipelineState(m_pAxesPipelineState.Get());
+		pCommandList->SetPipelineState(m_pAxesPipelineState.Get());
 
-		m_pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-		m_pCommandList->IASetVertexBuffers(0, 1, &m_controllerAxisVertexBufferView);
-		m_pCommandList->DrawInstanced(m_uiControllerVertcount, 1, 0, 0);
+		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		pCommandList->IASetVertexBuffers(0, 1, &m_controllerAxisVertexBufferView);
+		pCommandList->DrawInstanced(m_uiControllerVertcount, 1, 0, 0);
 	}
 
 	// ----- Render Model rendering -----
-	m_pCommandList->SetPipelineState(m_pRenderModelPipelineState.Get());
+	pCommandList->SetPipelineState(m_pRenderModelPipelineState.Get());
 	for (uint32_t unTrackedDevice = 0; unTrackedDevice < vr::k_unMaxTrackedDeviceCount; unTrackedDevice++)
 	{
 		if (!m_rTrackedDeviceToRenderModel[unTrackedDevice])
@@ -1243,51 +1247,57 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye)
 
 		Matrix4 matMVP = m_hmd->GetCurrentViewProjectionMatrix(nEye) * m_hmd->DevicePose(unTrackedDevice);
 
-		m_rTrackedDeviceToRenderModel[unTrackedDevice]->Draw(nEye, m_pCommandList.Get(), m_nCBVSRVDescriptorSize, matMVP);
+		m_rTrackedDeviceToRenderModel[unTrackedDevice]->Draw(nEye, pCommandList.Get(), m_nCBVSRVDescriptorSize, matMVP);
 	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CMainApplication::RenderCompanionWindow()
+void CMainApplication::RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &swapchainRTV)
 {
-	m_pCommandList->SetPipelineState(m_pCompanionPipelineState.Get());
+	pCommandList->SetPipelineState(m_pCompanionPipelineState.Get());
 
 	// Transition swapchain image to RENDER_TARGET
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_d3d->FrameIndex()].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	pCommandList->ResourceBarrier(
+		1, &CD3DX12_RESOURCE_BARRIER::Transition(
+			   swapchainRTV.Get(),
+			   D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// Bind current swapchain image
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
 	rtvHandle.Offset(RTV_SWAPCHAIN0 + m_d3d->FrameIndex(), m_nRTVDescriptorSize);
-	m_pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
+	pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
 
 	auto w = m_sdl->Width();
 	auto h = m_sdl->Height();
 	D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)w, (FLOAT)h, 0.0f, 1.0f};
 	D3D12_RECT scissor = {0, 0, (LONG)w, (LONG)h};
 
-	m_pCommandList->RSSetViewports(1, &viewport);
-	m_pCommandList->RSSetScissorRects(1, &scissor);
+	pCommandList->RSSetViewports(1, &viewport);
+	pCommandList->RSSetScissorRects(1, &scissor);
 
 	// render left eye (first half of index array)
 	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandleLeftEye(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
 	srvHandleLeftEye.Offset(SRV_LEFT_EYE, m_nCBVSRVDescriptorSize);
-	m_pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleLeftEye);
+	pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleLeftEye);
 
-	m_pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_pCommandList->IASetVertexBuffers(0, 1, &m_companionWindowVertexBufferView);
-	m_pCommandList->IASetIndexBuffer(&m_companionWindowIndexBufferView);
-	m_pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, 0, 0, 0);
+	pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	pCommandList->IASetVertexBuffers(0, 1, &m_companionWindowVertexBufferView);
+	pCommandList->IASetIndexBuffer(&m_companionWindowIndexBufferView);
+	pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, 0, 0, 0);
 
 	// render right eye (second half of index array)
 	CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandleRightEye(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
 	srvHandleRightEye.Offset(SRV_RIGHT_EYE, m_nCBVSRVDescriptorSize);
-	m_pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleRightEye);
-	m_pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, (m_uiCompanionWindowIndexSize / 2), 0, 0);
+	pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleRightEye);
+	pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, (m_uiCompanionWindowIndexSize / 2), 0, 0);
 
 	// Transition swapchain image to PRESENT
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_d3d->FrameIndex()].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	pCommandList->ResourceBarrier(
+		1, &CD3DX12_RESOURCE_BARRIER::Transition(
+			   swapchainRTV.Get(),
+			   D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 }
 
 //-----------------------------------------------------------------------------
