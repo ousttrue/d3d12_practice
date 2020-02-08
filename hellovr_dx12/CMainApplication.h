@@ -16,6 +16,7 @@ class CMainApplication
     class Models *m_models = nullptr;
     class Axis *m_axis = nullptr;
     class CBV *m_cbv = nullptr;
+    class CompanionWindow *m_companionWindow = nullptr;
 
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -56,7 +57,6 @@ private:
 
     std::string m_strPoseClasses; // what classes we saw poses for this frame
 
-    unsigned int m_uiCompanionWindowIndexSize;
 
     // D3D12 members
     static const int g_nFrameCount = 2; // Swapchain depth
@@ -73,19 +73,7 @@ private:
     ComPtr<ID3D12Resource> m_pTexture;
     ComPtr<ID3D12Resource> m_pTextureUploadHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_textureShaderResourceView;
-    ComPtr<ID3D12Resource> m_pCompanionWindowVertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_companionWindowVertexBufferView;
-    ComPtr<ID3D12Resource> m_pCompanionWindowIndexBuffer;
-    D3D12_INDEX_BUFFER_VIEW m_companionWindowIndexBufferView;
 
-
-    struct VertexDataWindow
-    {
-        Vector2 position;
-        Vector2 texCoord;
-
-        VertexDataWindow(const Vector2 &pos, const Vector2 tex) : position(pos), texCoord(tex) {}
-    };
 
     struct FramebufferDesc
     {

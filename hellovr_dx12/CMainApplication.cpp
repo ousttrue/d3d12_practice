@@ -13,6 +13,7 @@
 #include "Cubes.h"
 #include "Models.h"
 #include "Axis.h"
+#include "CompanionWindow.h"
 #include "lodepng.h"
 #include "pathtools.h"
 
@@ -31,7 +32,6 @@ const std::string g_rendermodel =
 
 using Microsoft::WRL::ComPtr;
 
-
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
@@ -39,7 +39,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iScen
     : m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale),
       m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
       m_cbv(new CBV),
-      m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)),
+      m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow),
       m_strPoseClasses(""), m_bShowCubes(true)
 {
     memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
@@ -50,6 +50,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iScen
 //-----------------------------------------------------------------------------
 CMainApplication::~CMainApplication()
 {
+    delete m_companionWindow;
     delete m_axis;
     delete m_models;
     delete m_cubes;
@@ -203,12 +204,11 @@ bool CMainApplication::BInitD3D12()
         {
             m_cubes->SetupScene(m_d3d->Device());
         }
-
         m_hmd->SetupCameras();
-        SetupStereoRenderTargets();
-        SetupCompanionWindow();
         if (m_hmd->Hmd())
         {
+            SetupStereoRenderTargets();
+            m_companionWindow->SetupCompanionWindow(m_d3d->Device());
             m_models->SetupRenderModels(m_hmd, m_d3d->Device(), m_cbv->Heap(), pCommandList);
         }
 
@@ -744,9 +744,6 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 //-----------------------------------------------------------------------------
 bool CMainApplication::SetupStereoRenderTargets()
 {
-    if (!m_hmd->Hmd())
-        return false;
-
     m_hmd->Hmd()->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
     m_nRenderWidth = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderWidth);
     m_nRenderHeight = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderHeight);
@@ -754,64 +751,6 @@ bool CMainApplication::SetupStereoRenderTargets()
     CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_leftEyeDesc, true);
     CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_rightEyeDesc, false);
     return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-void CMainApplication::SetupCompanionWindow()
-{
-    if (!m_hmd->Hmd())
-        return;
-
-    std::vector<VertexDataWindow> vVerts;
-
-    // left eye verts
-    vVerts.push_back(VertexDataWindow(Vector2(-1, -1), Vector2(0, 1)));
-    vVerts.push_back(VertexDataWindow(Vector2(0, -1), Vector2(1, 1)));
-    vVerts.push_back(VertexDataWindow(Vector2(-1, 1), Vector2(0, 0)));
-    vVerts.push_back(VertexDataWindow(Vector2(0, 1), Vector2(1, 0)));
-
-    // right eye verts
-    vVerts.push_back(VertexDataWindow(Vector2(0, -1), Vector2(0, 1)));
-    vVerts.push_back(VertexDataWindow(Vector2(1, -1), Vector2(1, 1)));
-    vVerts.push_back(VertexDataWindow(Vector2(0, 1), Vector2(0, 0)));
-    vVerts.push_back(VertexDataWindow(Vector2(1, 1), Vector2(1, 0)));
-
-    m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                                             D3D12_HEAP_FLAG_NONE,
-                                             &CD3DX12_RESOURCE_DESC::Buffer(sizeof(VertexDataWindow) * vVerts.size()),
-                                             D3D12_RESOURCE_STATE_GENERIC_READ,
-                                             nullptr,
-                                             IID_PPV_ARGS(&m_pCompanionWindowVertexBuffer));
-
-    UINT8 *pMappedBuffer;
-    CD3DX12_RANGE readRange(0, 0);
-    m_pCompanionWindowVertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pMappedBuffer));
-    memcpy(pMappedBuffer, &vVerts[0], sizeof(VertexDataWindow) * vVerts.size());
-    m_pCompanionWindowVertexBuffer->Unmap(0, nullptr);
-
-    m_companionWindowVertexBufferView.BufferLocation = m_pCompanionWindowVertexBuffer->GetGPUVirtualAddress();
-    m_companionWindowVertexBufferView.StrideInBytes = sizeof(VertexDataWindow);
-    m_companionWindowVertexBufferView.SizeInBytes = (UINT)(sizeof(VertexDataWindow) * vVerts.size());
-
-    UINT16 vIndices[] = {0, 1, 3, 0, 3, 2, 4, 5, 7, 4, 7, 6};
-    m_uiCompanionWindowIndexSize = _countof(vIndices);
-
-    m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                                             D3D12_HEAP_FLAG_NONE,
-                                             &CD3DX12_RESOURCE_DESC::Buffer(sizeof(vIndices)),
-                                             D3D12_RESOURCE_STATE_GENERIC_READ,
-                                             nullptr,
-                                             IID_PPV_ARGS(&m_pCompanionWindowIndexBuffer));
-
-    m_pCompanionWindowIndexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pMappedBuffer));
-    memcpy(pMappedBuffer, &vIndices[0], sizeof(vIndices));
-    m_pCompanionWindowIndexBuffer->Unmap(0, nullptr);
-
-    m_companionWindowIndexBufferView.BufferLocation = m_pCompanionWindowIndexBuffer->GetGPUVirtualAddress();
-    m_companionWindowIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
-    m_companionWindowIndexBufferView.SizeInBytes = sizeof(vIndices);
 }
 
 //-----------------------------------------------------------------------------
@@ -935,19 +874,13 @@ void CMainApplication::RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandL
     pCommandList->RSSetViewports(1, &viewport);
     pCommandList->RSSetScissorRects(1, &scissor);
 
-    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    pCommandList->IASetVertexBuffers(0, 1, &m_companionWindowVertexBufferView);
-    pCommandList->IASetIndexBuffer(&m_companionWindowIndexBufferView);
-
     // render left eye (first half of index array)
     auto srvHandleLeftEye = m_cbv->GpuHandle(SRV_LEFT_EYE);
-    pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleLeftEye);
-    pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, 0, 0, 0);
 
     // render right eye (second half of index array)
     auto srvHandleRightEye = m_cbv->GpuHandle(SRV_RIGHT_EYE);
-    pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleRightEye);
-    pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, (m_uiCompanionWindowIndexSize / 2), 0, 0);
+
+    m_companionWindow->Draw(pCommandList, srvHandleLeftEye, srvHandleRightEye);
 
     // Transition swapchain image to PRESENT
     pCommandList->ResourceBarrier(
