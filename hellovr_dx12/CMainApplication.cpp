@@ -210,7 +210,7 @@ bool CMainApplication::BInitD3D12()
 	// Create command list
 	m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pCommandAllocators[m_d3d->FrameIndex()].Get(), m_pScenePipelineState.Get(), IID_PPV_ARGS(&m_pCommandList));
 
-	SetupTexturemaps();
+	SetupTexturemaps(m_pCommandList);
 	SetupScene();
 	m_hmd->SetupCameras();
 	SetupStereoRenderTargets();
@@ -614,7 +614,7 @@ bool CMainApplication::CreateAllShaders()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-bool CMainApplication::SetupTexturemaps()
+bool CMainApplication::SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	std::string sExecutableDirectory = Path_StripFilename(Path_GetExecutablePath());
 	std::string strFullPath = Path_MakeAbsolute("../../hellovr_dx12/cube_texture.png", sExecutableDirectory);
@@ -691,8 +691,8 @@ bool CMainApplication::SetupTexturemaps()
 		nullptr,
 		IID_PPV_ARGS(&m_pTextureUploadHeap));
 
-	UpdateSubresources(m_pCommandList.Get(), m_pTexture.Get(), m_pTextureUploadHeap.Get(), 0, 0, mipLevelData.size(), &mipLevelData[0]);
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+	UpdateSubresources(pCommandList.Get(), m_pTexture.Get(), m_pTextureUploadHeap.Get(), 0, 0, mipLevelData.size(), &mipLevelData[0]);
+	pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 	// Free mip pointers
 	for (size_t nMip = 0; nMip < mipLevelData.size(); nMip++)

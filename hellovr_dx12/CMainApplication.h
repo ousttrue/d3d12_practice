@@ -60,7 +60,7 @@ public:
     void ProcessVREvent(const vr::VREvent_t &event);
     void RenderFrame();
 
-    bool SetupTexturemaps();
+    bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     static void GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcWidth, int nSrcHeight, int *pDstWidthOut, int *pDstHeightOut);
 
     void SetupScene();
