@@ -48,18 +48,20 @@ public:
     virtual ~CMainApplication();
 
     bool BInit(bool bDebugD3D12, int iSceneVolumeInit);
+    void RunMainLoop();
+    static void GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcWidth, int nSrcHeight, int *pDstWidthOut, int *pDstHeightOut);
+
+private:
     bool BInitD3D12();
     bool BInitCompositor();
 
     void SetupRenderModels(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 
-    void RunMainLoop();
     bool HandleInput(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void ProcessVREvent(const vr::VREvent_t &event, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv);
 
     bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
-    static void GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcWidth, int nSrcHeight, int *pDstWidthOut, int *pDstHeightOut);
 
     void SetupScene();
     void AddCubeToScene(Matrix4 mat, std::vector<float> &vertdata);
