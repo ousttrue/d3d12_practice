@@ -132,7 +132,7 @@ bool DX12RenderModel::BInit(ID3D12Device *pDevice, ID3D12GraphicsCommandList *pC
             nullptr,
             IID_PPV_ARGS(&m_pTextureUploadHeap));
 
-        UpdateSubresources(pCommandList, m_pTexture.Get(), m_pTextureUploadHeap.Get(), 0, 0, mipLevelData.size(), &mipLevelData[0]);
+        UpdateSubresources(pCommandList, m_pTexture.Get(), m_pTextureUploadHeap.Get(), 0, 0, (UINT)mipLevelData.size(), &mipLevelData[0]);
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
         // Free mip pointers
@@ -210,5 +210,5 @@ void DX12RenderModel::Draw(vr::EVREye nEye, ID3D12GraphicsCommandList *pCommandL
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     pCommandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     pCommandList->IASetIndexBuffer(&m_indexBufferView);
-    pCommandList->DrawIndexedInstanced(m_unVertexCount, 1, 0, 0, 0);
+    pCommandList->DrawIndexedInstanced((UINT)m_unVertexCount, 1, 0, 0, 0);
 }
