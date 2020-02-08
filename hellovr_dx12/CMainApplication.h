@@ -53,7 +53,7 @@ public:
     bool BInitD3D12();
     bool BInitCompositor();
 
-    void SetupRenderModels();
+    void SetupRenderModels(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 
     void RunMainLoop();
     bool HandleInput();
@@ -76,8 +76,8 @@ public:
     void RenderCompanionWindow();
     void RenderScene(vr::Hmd_Eye nEye);
     bool CreateAllShaders();
-    void SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex);
-    class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName);
+    void SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
+    class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 
 private:
     int m_nMSAASampleCount;

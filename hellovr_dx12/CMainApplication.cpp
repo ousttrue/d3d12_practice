@@ -215,7 +215,7 @@ bool CMainApplication::BInitD3D12()
 	m_hmd->SetupCameras();
 	SetupStereoRenderTargets();
 	SetupCompanionWindow();
-	SetupRenderModels();
+	SetupRenderModels(m_pCommandList);
 
 	// Do any work that was queued up during loading
 	m_pCommandList->Close();
@@ -286,7 +286,7 @@ void CMainApplication::ProcessVREvent(const vr::VREvent_t &event)
 	{
 	case vr::VREvent_TrackedDeviceActivated:
 	{
-		SetupRenderModelForTrackedDevice(event.trackedDeviceIndex);
+		SetupRenderModelForTrackedDevice(event.trackedDeviceIndex, m_pCommandList);
 		dprintf("Device %u attached. Setting up render model.\n", event.trackedDeviceIndex);
 	}
 	break;
@@ -668,11 +668,11 @@ bool CMainApplication::SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> 
 	textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-									   D3D12_HEAP_FLAG_NONE,
-									   &textureDesc,
-									   D3D12_RESOURCE_STATE_COPY_DEST,
-									   nullptr,
-									   IID_PPV_ARGS(&m_pTexture));
+											 D3D12_HEAP_FLAG_NONE,
+											 &textureDesc,
+											 D3D12_RESOURCE_STATE_COPY_DEST,
+											 nullptr,
+											 IID_PPV_ARGS(&m_pTexture));
 
 	// Create shader resource view
 	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
@@ -794,11 +794,11 @@ void CMainApplication::SetupScene()
 	m_uiVertcount = vertdataarray.size() / 5;
 
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-									   D3D12_HEAP_FLAG_NONE,
-									   &CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * vertdataarray.size()),
-									   D3D12_RESOURCE_STATE_GENERIC_READ,
-									   nullptr,
-									   IID_PPV_ARGS(&m_pSceneVertexBuffer));
+											 D3D12_HEAP_FLAG_NONE,
+											 &CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * vertdataarray.size()),
+											 D3D12_RESOURCE_STATE_GENERIC_READ,
+											 nullptr,
+											 IID_PPV_ARGS(&m_pSceneVertexBuffer));
 
 	UINT8 *pMappedBuffer;
 	CD3DX12_RANGE readRange(0, 0);
@@ -1012,11 +1012,11 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 
 	// Create color target
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-									   D3D12_HEAP_FLAG_NONE,
-									   &textureDesc,
-									   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-									   &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, clearColor),
-									   IID_PPV_ARGS(&framebufferDesc.m_pTexture));
+											 D3D12_HEAP_FLAG_NONE,
+											 &textureDesc,
+											 D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+											 &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, clearColor),
+											 IID_PPV_ARGS(&framebufferDesc.m_pTexture));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
 	rtvHandle.Offset(nRTVIndex, m_nRTVDescriptorSize);
@@ -1033,11 +1033,11 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 	depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
 	depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-									   D3D12_HEAP_FLAG_NONE,
-									   &depthDesc,
-									   D3D12_RESOURCE_STATE_DEPTH_WRITE,
-									   &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D32_FLOAT, 1.0f, 0),
-									   IID_PPV_ARGS(&framebufferDesc.m_pDepthStencil));
+											 D3D12_HEAP_FLAG_NONE,
+											 &depthDesc,
+											 D3D12_RESOURCE_STATE_DEPTH_WRITE,
+											 &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D32_FLOAT, 1.0f, 0),
+											 IID_PPV_ARGS(&framebufferDesc.m_pDepthStencil));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_pDSVHeap->GetCPUDescriptorHandleForHeapStart());
 	dsvHandle.Offset(nRTVIndex, m_nDSVDescriptorSize);
@@ -1086,11 +1086,11 @@ void CMainApplication::SetupCompanionWindow()
 	vVerts.push_back(VertexDataWindow(Vector2(1, 1), Vector2(1, 0)));
 
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-									   D3D12_HEAP_FLAG_NONE,
-									   &CD3DX12_RESOURCE_DESC::Buffer(sizeof(VertexDataWindow) * vVerts.size()),
-									   D3D12_RESOURCE_STATE_GENERIC_READ,
-									   nullptr,
-									   IID_PPV_ARGS(&m_pCompanionWindowVertexBuffer));
+											 D3D12_HEAP_FLAG_NONE,
+											 &CD3DX12_RESOURCE_DESC::Buffer(sizeof(VertexDataWindow) * vVerts.size()),
+											 D3D12_RESOURCE_STATE_GENERIC_READ,
+											 nullptr,
+											 IID_PPV_ARGS(&m_pCompanionWindowVertexBuffer));
 
 	UINT8 *pMappedBuffer;
 	CD3DX12_RANGE readRange(0, 0);
@@ -1106,11 +1106,11 @@ void CMainApplication::SetupCompanionWindow()
 	m_uiCompanionWindowIndexSize = _countof(vIndices);
 
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-									   D3D12_HEAP_FLAG_NONE,
-									   &CD3DX12_RESOURCE_DESC::Buffer(sizeof(vIndices)),
-									   D3D12_RESOURCE_STATE_GENERIC_READ,
-									   nullptr,
-									   IID_PPV_ARGS(&m_pCompanionWindowIndexBuffer));
+											 D3D12_HEAP_FLAG_NONE,
+											 &CD3DX12_RESOURCE_DESC::Buffer(sizeof(vIndices)),
+											 D3D12_RESOURCE_STATE_GENERIC_READ,
+											 nullptr,
+											 IID_PPV_ARGS(&m_pCompanionWindowIndexBuffer));
 
 	m_pCompanionWindowIndexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pMappedBuffer));
 	memcpy(pMappedBuffer, &vIndices[0], sizeof(vIndices));
@@ -1272,7 +1272,8 @@ void CMainApplication::RenderCompanionWindow()
 //-----------------------------------------------------------------------------
 // Purpose: Finds a render model we've already loaded or loads a new one
 //-----------------------------------------------------------------------------
-DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName)
+DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName,
+														 const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	DX12RenderModel *pRenderModel = NULL;
 
@@ -1314,7 +1315,7 @@ DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_
 		}
 
 		pRenderModel = new DX12RenderModel(pchRenderModelName);
-		if (!pRenderModel->BInit(m_d3d->Device().Get(), m_pCommandList.Get(), m_pCBVSRVHeap.Get(), unTrackedDeviceIndex, *pModel, *pTexture))
+		if (!pRenderModel->BInit(m_d3d->Device().Get(), pCommandList.Get(), m_pCBVSRVHeap.Get(), unTrackedDeviceIndex, *pModel, *pTexture))
 		{
 			dprintf("Unable to create D3D12 model from render model %s\n", pchRenderModelName);
 			delete pRenderModel;
@@ -1330,14 +1331,14 @@ DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_
 //-----------------------------------------------------------------------------
 // Purpose: Create/destroy D3D12 a Render Model for a single tracked device
 //-----------------------------------------------------------------------------
-void CMainApplication::SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex)
+void CMainApplication::SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	if (unTrackedDeviceIndex >= vr::k_unMaxTrackedDeviceCount)
 		return;
 
 	// try to find a model we've already set up
 	auto sRenderModelName = m_hmd->RenderModelName(unTrackedDeviceIndex);
-	DX12RenderModel *pRenderModel = FindOrLoadRenderModel(unTrackedDeviceIndex, sRenderModelName.c_str());
+	DX12RenderModel *pRenderModel = FindOrLoadRenderModel(unTrackedDeviceIndex, sRenderModelName.c_str(), pCommandList);
 	if (!pRenderModel)
 	{
 		std::string sTrackingSystemName = m_hmd->SystemName(unTrackedDeviceIndex);
@@ -1352,7 +1353,7 @@ void CMainApplication::SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t
 //-----------------------------------------------------------------------------
 // Purpose: Create/destroy D3D12 Render Models
 //-----------------------------------------------------------------------------
-void CMainApplication::SetupRenderModels()
+void CMainApplication::SetupRenderModels(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
 	memset(m_rTrackedDeviceToRenderModel, 0, sizeof(m_rTrackedDeviceToRenderModel));
 
@@ -1364,6 +1365,6 @@ void CMainApplication::SetupRenderModels()
 		if (!m_hmd->Hmd()->IsTrackedDeviceConnected(unTrackedDevice))
 			continue;
 
-		SetupRenderModelForTrackedDevice(unTrackedDevice);
+		SetupRenderModelForTrackedDevice(unTrackedDevice, pCommandList);
 	}
 }
