@@ -1,7 +1,6 @@
 set(TARGET_NAME hellovr_dx12)
 add_executable(${TARGET_NAME}
     CMainApplication.cpp
-    DX12RenderModel.cpp
     SDLApplication.cpp
     Commandline.cpp
     Hmd.cpp
