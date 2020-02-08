@@ -6,6 +6,8 @@ add_executable(${TARGET_NAME}
     Hmd.cpp
     DeviceRTV.cpp
     Cubes.cpp
+    Models.cpp
+    GenMipMapRGBA.cpp
     dprintf.cpp
     main.cpp
     lodepng.cpp

@@ -13,6 +13,7 @@ class CMainApplication
     class HMD *m_hmd = nullptr;
     class DeviceRTV *m_d3d = nullptr;
     class Cubes *m_cubes = nullptr;
+    class Models *m_models = nullptr;
 
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -23,7 +24,6 @@ public:
 
     bool Initialize(bool bDebugD3D12);
     void RunMainLoop();
-    static void GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcWidth, int nSrcHeight, int *pDstWidthOut, int *pDstHeightOut);
 
 private:
     bool BInitD3D12();
@@ -37,10 +37,6 @@ private:
 
     bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 
-    void SetupScene();
-    void AddCubeToScene(Matrix4 mat, std::vector<float> &vertdata);
-    void AddCubeVertex(float fl0, float fl1, float fl2, float fl3, float fl4, std::vector<float> &vertdata);
-
     void UpdateControllerAxes();
 
     bool SetupStereoRenderTargets();
@@ -50,8 +46,6 @@ private:
     void RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &swapchainRTV);
     void RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     bool CreateAllShaders();
-    void SetupRenderModelForTrackedDevice(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
-    class DX12RenderModel *FindOrLoadRenderModel(vr::TrackedDeviceIndex_t unTrackedDeviceIndex, const char *pchRenderModelName, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 
 private:
     int m_nMSAASampleCount;
@@ -63,7 +57,6 @@ private:
     bool m_bShowCubes;
 
     std::string m_strPoseClasses; // what classes we saw poses for this frame
-
 
     unsigned int m_uiCompanionWindowIndexSize;
 
@@ -115,6 +108,4 @@ private:
 
     uint32_t m_nRenderWidth;
     uint32_t m_nRenderHeight;
-
-    DX12RenderModel *m_rTrackedDeviceToRenderModel[vr::k_unMaxTrackedDeviceCount];
 };
