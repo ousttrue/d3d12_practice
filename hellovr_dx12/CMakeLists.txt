@@ -29,3 +29,4 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     optimized $ENV{VCPKG_DIR}/installed/x64-windows/lib/manual-link/SDL2Main.lib
     debug $ENV{VCPKG_DIR}/installed/x64-windows/debug/lib/manual-link/SDL2Maind.lib
     )
+set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 20)

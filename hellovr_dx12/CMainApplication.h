@@ -40,13 +40,17 @@ enum CBVSRVIndex_t
 class CMainApplication
 {
     class HMD *m_hmd = nullptr;
+    class D3D *m_d3d = nullptr;
+
+    template <class T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 public:
     CMainApplication(int msaa, float flSuperSampleScale);
     virtual ~CMainApplication();
 
     bool BInit(bool bDebugD3D12, int iSceneVolumeInit);
-    bool BInitD3D12(bool bDebugD3D12);
+    bool BInitD3D12();
     bool BInitCompositor();
 
     void SetupRenderModels();
@@ -101,19 +105,9 @@ private:
     unsigned int m_uiVertcount;
     unsigned int m_uiCompanionWindowIndexSize;
 
-    template <class T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     // D3D12 members
-    UINT m_nFrameIndex;
-    HANDLE m_fenceEvent;
-    ComPtr<ID3D12Fence> m_pFence;
     static const int g_nFrameCount = 2; // Swapchain depth
-    UINT64 m_nFenceValues[g_nFrameCount];
-    ComPtr<ID3D12Device> m_pDevice;
-    ComPtr<IDXGISwapChain3> m_pSwapChain;
     ComPtr<ID3D12Resource> m_pSwapChainRenderTarget[g_nFrameCount];
-    ComPtr<ID3D12CommandQueue> m_pCommandQueue;
     ComPtr<ID3D12CommandAllocator> m_pCommandAllocators[g_nFrameCount];
     ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
     ComPtr<ID3D12DescriptorHeap> m_pCBVSRVHeap;

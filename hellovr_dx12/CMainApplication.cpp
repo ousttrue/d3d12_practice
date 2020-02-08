@@ -32,12 +32,141 @@ void ThreadSleep(unsigned long nMilliseconds)
 	::Sleep(nMilliseconds);
 }
 
+class D3D
+{
+	// d3d12
+	ComPtr<ID3D12Device> m_pDevice;
+	ComPtr<ID3D12CommandQueue> m_pCommandQueue;
+	HANDLE m_fenceEvent = NULL;
+	ComPtr<ID3D12Fence> m_pFence;
+	std::vector<UINT64> m_nFenceValues;
+
+	// swapchain
+	ComPtr<IDXGISwapChain3> m_pSwapChain;
+	UINT m_nFrameIndex = 0;
+
+public:
+	D3D(int frameCount)
+		: m_nFenceValues(frameCount, 0)
+	{
+	}
+
+	const ComPtr<ID3D12Device> &Device() const { return m_pDevice; }
+	const ComPtr<ID3D12CommandQueue> &Queue() const { return m_pCommandQueue; }
+	const ComPtr<IDXGISwapChain3> &Swapchain() const { return m_pSwapChain; }
+	UINT FrameIndex() const { return m_nFrameIndex; }
+
+	ComPtr<ID3D12Device> CreateDevice(const ComPtr<IDXGIFactory4> &factory, int adapterIndex)
+	{
+		ComPtr<IDXGIAdapter1> adapter;
+		if (FAILED(factory->EnumAdapters1(adapterIndex, &adapter)))
+		{
+			return nullptr;
+		}
+
+		if (FAILED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice))))
+		{
+			return nullptr;
+		}
+
+		D3D12_COMMAND_QUEUE_DESC queueDesc{
+			.Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
+			.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+		};
+		if (FAILED(m_pDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_pCommandQueue))))
+		{
+			return nullptr;
+		}
+
+		// Create fence
+		{
+			// memset(m_nFenceValues, 0, sizeof(m_nFenceValues));
+			m_pDevice->CreateFence(m_nFenceValues[m_nFrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence));
+			m_nFenceValues[m_nFrameIndex]++;
+
+			m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		}
+
+		return m_pDevice;
+	}
+
+	bool CreateSwapchain(const ComPtr<IDXGIFactory4> &pFactory, int width, int height, HWND hWnd)
+	{
+		// Create the swapchain
+		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+		swapChainDesc.BufferCount = (UINT)m_nFenceValues.size();
+		swapChainDesc.Width = width;
+		swapChainDesc.Height = height;
+		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		swapChainDesc.SampleDesc.Count = 1;
+
+		ComPtr<IDXGISwapChain1> pSwapChain;
+		if (FAILED(pFactory->CreateSwapChainForHwnd(m_pCommandQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr, &pSwapChain)))
+		{
+			dprintf("Failed to create DXGI swapchain.\n");
+			return false;
+		}
+
+		pFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
+		pSwapChain.As(&m_pSwapChain);
+		m_nFrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+
+		return true;
+	}
+
+	void Execute(const ComPtr<ID3D12CommandList> &commandList)
+	{
+		m_pCommandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
+	}
+
+	void Sync()
+	{
+		const UINT64 value = m_nFenceValues[m_nFrameIndex]++;
+		m_pCommandQueue->Signal(m_pFence.Get(), value);
+		m_nFrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+		if (m_pFence->GetCompletedValue() < value)
+		{
+			m_pFence->SetEventOnCompletion(value, m_fenceEvent);
+			WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
+		}
+	}
+
+	void Present()
+	{
+		m_pSwapChain->Present(0, 0);
+	}
+};
+
+ComPtr<IDXGIFactory4> CreateFactory(bool isDebug)
+{
+	UINT flag = 0;
+	if (isDebug)
+	{
+		ComPtr<ID3D12Debug> debug;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
+		{
+			debug->EnableDebugLayer();
+			flag |= DXGI_CREATE_FACTORY_DEBUG;
+		}
+	}
+	ComPtr<IDXGIFactory4> factory;
+	if (FAILED(CreateDXGIFactory2(flag, IID_PPV_ARGS(&factory))))
+	{
+		return nullptr;
+	}
+	return factory;
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
-	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale), m_sdl(new SDLApplication), m_hmd(new HMD),
-	  m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1), m_strPoseClasses(""), m_bShowCubes(true), m_nFrameIndex(0), m_fenceEvent(NULL), m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
+	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale), m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new D3D(g_nFrameCount)),
+	  m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1),
+	  m_strPoseClasses(""), m_bShowCubes(true),
+	  m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
 {
 	memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
 };
@@ -47,6 +176,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
 //-----------------------------------------------------------------------------
 CMainApplication::~CMainApplication()
 {
+	delete m_d3d;
 	delete m_hmd;
 	delete m_sdl;
 	dprintf("Shutdown");
@@ -78,7 +208,25 @@ bool CMainApplication::BInit(bool bDebugD3D12, int iSceneVolumeInit)
 
 	m_uiVertcount = 0;
 
-	if (!BInitD3D12(bDebugD3D12))
+	auto factory = CreateFactory(bDebugD3D12);
+	if (!factory)
+	{
+		return false;
+	}
+
+	// Query OpenVR for the output adapter index
+	int32_t nAdapterIndex = m_hmd->AdapterIndex();
+
+	if (!m_d3d->CreateDevice(factory, nAdapterIndex))
+	{
+		return false;
+	}
+	if (!m_d3d->CreateSwapchain(factory, m_sdl->Width(), m_sdl->Height(), (HWND)m_sdl->HWND()))
+	{
+		return false;
+	}
+
+	if (!BInitD3D12())
 	{
 		dprintf("%s - Unable to initialize D3D12!\n", __FUNCTION__);
 		return false;
@@ -99,76 +247,9 @@ bool CMainApplication::BInit(bool bDebugD3D12, int iSceneVolumeInit)
 //          If failure occurred in a module other than shaders, the function
 //          may return true or throw an error.
 //-----------------------------------------------------------------------------
-bool CMainApplication::BInitD3D12(bool bDebugD3D12)
+bool CMainApplication::BInitD3D12()
 {
-	UINT nDXGIFactoryFlags = 0;
-
-	// Debug layers if -dxdebug is specified
-	if (bDebugD3D12)
-	{
-		ComPtr<ID3D12Debug> pDebugController;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pDebugController))))
-		{
-			pDebugController->EnableDebugLayer();
-			nDXGIFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-		}
-	}
-
-	ComPtr<IDXGIFactory4> pFactory;
-	if (FAILED(CreateDXGIFactory2(nDXGIFactoryFlags, IID_PPV_ARGS(&pFactory))))
-	{
-		dprintf("CreateDXGIFactory2 failed.\n");
-		return false;
-	}
-
-	// Query OpenVR for the output adapter index
-	int32_t nAdapterIndex = m_hmd->AdapterIndex();
-
-	ComPtr<IDXGIAdapter1> pAdapter;
-	if (FAILED(pFactory->EnumAdapters1(nAdapterIndex, &pAdapter)))
-	{
-		dprintf("Error enumerating DXGI adapter.\n");
-	}
-	DXGI_ADAPTER_DESC1 adapterDesc;
-	pAdapter->GetDesc1(&adapterDesc);
-
-	if (FAILED(D3D12CreateDevice(pAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice))))
-	{
-		dprintf("Failed to create D3D12 device with D3D12CreateDevice.\n");
-		return false;
-	}
-
-	// Create the command queue
-	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	if (FAILED(m_pDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_pCommandQueue))))
-	{
-		printf("Failed to create D3D12 command queue.\n");
-		return false;
-	}
-
-	// Create the swapchain
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-	swapChainDesc.BufferCount = g_nFrameCount;
-	swapChainDesc.Width = m_sdl->Width();
-	swapChainDesc.Height = m_sdl->Height();
-	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.SampleDesc.Count = 1;
-
-	auto hWnd = reinterpret_cast<HWND>(m_sdl->HWND());
-	ComPtr<IDXGISwapChain1> pSwapChain;
-	if (FAILED(pFactory->CreateSwapChainForHwnd(m_pCommandQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr, &pSwapChain)))
-	{
-		dprintf("Failed to create DXGI swapchain.\n");
-		return false;
-	}
-
-	pFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
-	pSwapChain.As(&m_pSwapChain);
-	m_nFrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+	auto m_pDevice = m_d3d->Device();
 
 	// Create descriptor heaps
 	{
@@ -205,7 +286,7 @@ bool CMainApplication::BInitD3D12(bool bDebugD3D12)
 		}
 
 		// Create swapchain render targets
-		m_pSwapChain->GetBuffer(nFrame, IID_PPV_ARGS(&m_pSwapChainRenderTarget[nFrame]));
+		m_d3d->Swapchain()->GetBuffer(nFrame, IID_PPV_ARGS(&m_pSwapChainRenderTarget[nFrame]));
 
 		// Create swapchain render target views
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
@@ -248,20 +329,11 @@ bool CMainApplication::BInitD3D12(bool bDebugD3D12)
 		m_sceneConstantBufferView[1] = cbvRightEyeHandle;
 	}
 
-	// Create fence
-	{
-		memset(m_nFenceValues, 0, sizeof(m_nFenceValues));
-		m_pDevice->CreateFence(m_nFenceValues[m_nFrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence));
-		m_nFenceValues[m_nFrameIndex]++;
-
-		m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	}
-
 	if (!CreateAllShaders())
 		return false;
 
 	// Create command list
-	m_pDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pCommandAllocators[m_nFrameIndex].Get(), m_pScenePipelineState.Get(), IID_PPV_ARGS(&m_pCommandList));
+	m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pCommandAllocators[m_d3d->FrameIndex()].Get(), m_pScenePipelineState.Get(), IID_PPV_ARGS(&m_pCommandList));
 
 	SetupTexturemaps();
 	SetupScene();
@@ -272,14 +344,9 @@ bool CMainApplication::BInitD3D12(bool bDebugD3D12)
 
 	// Do any work that was queued up during loading
 	m_pCommandList->Close();
-	ID3D12CommandList *ppCommandLists[] = {m_pCommandList.Get()};
-	m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	// Wait for it to finish
-	m_pCommandQueue->Signal(m_pFence.Get(), m_nFenceValues[m_nFrameIndex]);
-	m_pFence->SetEventOnCompletion(m_nFenceValues[m_nFrameIndex], m_fenceEvent);
-	WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
-	m_nFenceValues[m_nFrameIndex]++;
+	m_d3d->Execute(m_pCommandList);
+	m_d3d->Sync();
 
 	return true;
 }
@@ -368,9 +435,9 @@ void CMainApplication::RenderFrame()
 {
 	if (m_hmd->Hmd())
 	{
-		m_pCommandAllocators[m_nFrameIndex]->Reset();
+		m_pCommandAllocators[m_d3d->FrameIndex()]->Reset();
 
-		m_pCommandList->Reset(m_pCommandAllocators[m_nFrameIndex].Get(), m_pScenePipelineState.Get());
+		m_pCommandList->Reset(m_pCommandAllocators[m_d3d->FrameIndex()].Get(), m_pScenePipelineState.Get());
 		m_pCommandList->SetGraphicsRootSignature(m_pRootSignature.Get());
 
 		ID3D12DescriptorHeap *ppHeaps[] = {m_pCBVSRVHeap.Get()};
@@ -383,8 +450,7 @@ void CMainApplication::RenderFrame()
 		m_pCommandList->Close();
 
 		// Execute the command list.
-		ID3D12CommandList *ppCommandLists[] = {m_pCommandList.Get()};
-		m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		m_d3d->Execute(m_pCommandList);
 
 		vr::VRTextureBounds_t bounds;
 		bounds.uMin = 0.0f;
@@ -392,32 +458,20 @@ void CMainApplication::RenderFrame()
 		bounds.vMin = 0.0f;
 		bounds.vMax = 1.0f;
 
-		vr::D3D12TextureData_t d3d12LeftEyeTexture = {m_leftEyeDesc.m_pTexture.Get(), m_pCommandQueue.Get(), 0};
+		vr::D3D12TextureData_t d3d12LeftEyeTexture = {m_leftEyeDesc.m_pTexture.Get(), m_d3d->Queue().Get(), 0};
 		vr::Texture_t leftEyeTexture = {(void *)&d3d12LeftEyeTexture, vr::TextureType_DirectX12, vr::ColorSpace_Gamma};
 		vr::VRCompositor()->Submit(vr::Eye_Left, &leftEyeTexture, &bounds, vr::Submit_Default);
 
-		vr::D3D12TextureData_t d3d12RightEyeTexture = {m_rightEyeDesc.m_pTexture.Get(), m_pCommandQueue.Get(), 0};
+		vr::D3D12TextureData_t d3d12RightEyeTexture = {m_rightEyeDesc.m_pTexture.Get(), m_d3d->Queue().Get(), 0};
 		vr::Texture_t rightEyeTexture = {(void *)&d3d12RightEyeTexture, vr::TextureType_DirectX12, vr::ColorSpace_Gamma};
 		vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture, &bounds, vr::Submit_Default);
 	}
 
 	// Present
-	m_pSwapChain->Present(0, 0);
+	m_d3d->Present();
 
 	// Wait for completion
-	{
-		const UINT64 nCurrentFenceValue = m_nFenceValues[m_nFrameIndex];
-		m_pCommandQueue->Signal(m_pFence.Get(), nCurrentFenceValue);
-
-		m_nFrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
-		if (m_pFence->GetCompletedValue() < m_nFenceValues[m_nFrameIndex])
-		{
-			m_pFence->SetEventOnCompletion(m_nFenceValues[m_nFrameIndex], m_fenceEvent);
-			WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
-		}
-
-		m_nFenceValues[m_nFrameIndex] = nCurrentFenceValue + 1;
-	}
+	m_d3d->Sync();
 
 	// Spew out the controller and pose count whenever they change.
 	if (m_iTrackedControllerCount != m_iTrackedControllerCount_Last || m_iValidPoseCount != m_iValidPoseCount_Last)
@@ -443,7 +497,7 @@ bool CMainApplication::CreateAllShaders()
 	{
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		if (FAILED(m_pDevice->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		if (FAILED(m_d3d->Device()->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 		{
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 		}
@@ -476,7 +530,7 @@ bool CMainApplication::CreateAllShaders()
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 		D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
-		m_pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_pRootSignature));
+		m_d3d->Device()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_pRootSignature));
 	}
 
 	// Scene shader
@@ -522,7 +576,7 @@ bool CMainApplication::CreateAllShaders()
 		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		psoDesc.SampleDesc.Count = m_nMSAASampleCount;
 		psoDesc.SampleDesc.Quality = 0;
-		if (FAILED(m_pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pScenePipelineState))))
+		if (FAILED(m_d3d->Device()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pScenePipelineState))))
 		{
 			dprintf("Error creating D3D12 pipeline state.\n");
 			return false;
@@ -571,7 +625,7 @@ bool CMainApplication::CreateAllShaders()
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
-		if (FAILED(m_pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pCompanionPipelineState))))
+		if (FAILED(m_d3d->Device()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pCompanionPipelineState))))
 		{
 			dprintf("Error creating D3D12 pipeline state.\n");
 			return false;
@@ -621,7 +675,7 @@ bool CMainApplication::CreateAllShaders()
 		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		psoDesc.SampleDesc.Count = m_nMSAASampleCount;
 		psoDesc.SampleDesc.Quality = 0;
-		if (FAILED(m_pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pAxesPipelineState))))
+		if (FAILED(m_d3d->Device()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pAxesPipelineState))))
 		{
 			dprintf("Error creating D3D12 pipeline state.\n");
 			return false;
@@ -672,7 +726,7 @@ bool CMainApplication::CreateAllShaders()
 		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		psoDesc.SampleDesc.Count = m_nMSAASampleCount;
 		psoDesc.SampleDesc.Quality = 0;
-		if (FAILED(m_pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pRenderModelPipelineState))))
+		if (FAILED(m_d3d->Device()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pRenderModelPipelineState))))
 		{
 			dprintf("Error creating D3D12 pipeline state.\n");
 			return false;
@@ -738,7 +792,7 @@ bool CMainApplication::SetupTexturemaps()
 	textureDesc.SampleDesc.Quality = 0;
 	textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-	m_pDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 									   D3D12_HEAP_FLAG_NONE,
 									   &textureDesc,
 									   D3D12_RESOURCE_STATE_COPY_DEST,
@@ -748,13 +802,13 @@ bool CMainApplication::SetupTexturemaps()
 	// Create shader resource view
 	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
 	srvHandle.Offset(SRV_TEXTURE_MAP, m_nCBVSRVDescriptorSize);
-	m_pDevice->CreateShaderResourceView(m_pTexture.Get(), nullptr, srvHandle);
+	m_d3d->Device()->CreateShaderResourceView(m_pTexture.Get(), nullptr, srvHandle);
 	m_textureShaderResourceView = srvHandle;
 
 	const UINT64 nUploadBufferSize = GetRequiredIntermediateSize(m_pTexture.Get(), 0, textureDesc.MipLevels);
 
 	// Create the GPU upload buffer.
-	m_pDevice->CreateCommittedResource(
+	m_d3d->Device()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(nUploadBufferSize),
@@ -864,7 +918,7 @@ void CMainApplication::SetupScene()
 	}
 	m_uiVertcount = vertdataarray.size() / 5;
 
-	m_pDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 									   D3D12_HEAP_FLAG_NONE,
 									   &CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * vertdataarray.size()),
 									   D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -1038,7 +1092,7 @@ void CMainApplication::UpdateControllerAxes()
 		size_t nSize = sizeof(float) * vertdataarray.size();
 		nSize *= vr::k_unMaxTrackedDeviceCount;
 
-		m_pDevice->CreateCommittedResource(
+		m_d3d->Device()->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(nSize),
@@ -1082,7 +1136,7 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 	const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
 
 	// Create color target
-	m_pDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 									   D3D12_HEAP_FLAG_NONE,
 									   &textureDesc,
 									   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -1091,19 +1145,19 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
 	rtvHandle.Offset(nRTVIndex, m_nRTVDescriptorSize);
-	m_pDevice->CreateRenderTargetView(framebufferDesc.m_pTexture.Get(), nullptr, rtvHandle);
+	m_d3d->Device()->CreateRenderTargetView(framebufferDesc.m_pTexture.Get(), nullptr, rtvHandle);
 	framebufferDesc.m_renderTargetViewHandle = rtvHandle;
 
 	// Create shader resource view
 	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
 	srvHandle.Offset(SRV_LEFT_EYE + nRTVIndex, m_nCBVSRVDescriptorSize);
-	m_pDevice->CreateShaderResourceView(framebufferDesc.m_pTexture.Get(), nullptr, srvHandle);
+	m_d3d->Device()->CreateShaderResourceView(framebufferDesc.m_pTexture.Get(), nullptr, srvHandle);
 
 	// Create depth
 	D3D12_RESOURCE_DESC depthDesc = textureDesc;
 	depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
 	depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-	m_pDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 									   D3D12_HEAP_FLAG_NONE,
 									   &depthDesc,
 									   D3D12_RESOURCE_STATE_DEPTH_WRITE,
@@ -1112,7 +1166,7 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_pDSVHeap->GetCPUDescriptorHandleForHeapStart());
 	dsvHandle.Offset(nRTVIndex, m_nDSVDescriptorSize);
-	m_pDevice->CreateDepthStencilView(framebufferDesc.m_pDepthStencil.Get(), nullptr, dsvHandle);
+	m_d3d->Device()->CreateDepthStencilView(framebufferDesc.m_pDepthStencil.Get(), nullptr, dsvHandle);
 	framebufferDesc.m_depthStencilViewHandle = dsvHandle;
 	return true;
 }
@@ -1156,7 +1210,7 @@ void CMainApplication::SetupCompanionWindow()
 	vVerts.push_back(VertexDataWindow(Vector2(0, 1), Vector2(0, 0)));
 	vVerts.push_back(VertexDataWindow(Vector2(1, 1), Vector2(1, 0)));
 
-	m_pDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 									   D3D12_HEAP_FLAG_NONE,
 									   &CD3DX12_RESOURCE_DESC::Buffer(sizeof(VertexDataWindow) * vVerts.size()),
 									   D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -1176,7 +1230,7 @@ void CMainApplication::SetupCompanionWindow()
 	UINT16 vIndices[] = {0, 1, 3, 0, 3, 2, 4, 5, 7, 4, 7, 6};
 	m_uiCompanionWindowIndexSize = _countof(vIndices);
 
-	m_pDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 									   D3D12_HEAP_FLAG_NONE,
 									   &CD3DX12_RESOURCE_DESC::Buffer(sizeof(vIndices)),
 									   D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -1305,11 +1359,11 @@ void CMainApplication::RenderCompanionWindow()
 	m_pCommandList->SetPipelineState(m_pCompanionPipelineState.Get());
 
 	// Transition swapchain image to RENDER_TARGET
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_nFrameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_d3d->FrameIndex()].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// Bind current swapchain image
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
-	rtvHandle.Offset(RTV_SWAPCHAIN0 + m_nFrameIndex, m_nRTVDescriptorSize);
+	rtvHandle.Offset(RTV_SWAPCHAIN0 + m_d3d->FrameIndex(), m_nRTVDescriptorSize);
 	m_pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
 
 	auto w = m_sdl->Width();
@@ -1337,7 +1391,7 @@ void CMainApplication::RenderCompanionWindow()
 	m_pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, (m_uiCompanionWindowIndexSize / 2), 0, 0);
 
 	// Transition swapchain image to PRESENT
-	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_nFrameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	m_pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pSwapChainRenderTarget[m_d3d->FrameIndex()].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 }
 
 //-----------------------------------------------------------------------------
@@ -1385,7 +1439,7 @@ DX12RenderModel *CMainApplication::FindOrLoadRenderModel(vr::TrackedDeviceIndex_
 		}
 
 		pRenderModel = new DX12RenderModel(pchRenderModelName);
-		if (!pRenderModel->BInit(m_pDevice.Get(), m_pCommandList.Get(), m_pCBVSRVHeap.Get(), unTrackedDeviceIndex, *pModel, *pTexture))
+		if (!pRenderModel->BInit(m_d3d->Device().Get(), m_pCommandList.Get(), m_pCBVSRVHeap.Get(), unTrackedDeviceIndex, *pModel, *pTexture))
 		{
 			dprintf("Unable to create D3D12 model from render model %s\n", pchRenderModelName);
 			delete pRenderModel;
