@@ -27,11 +27,29 @@ const std::string g_rendermodel =
 
 using Microsoft::WRL::ComPtr;
 
-void ThreadSleep(unsigned long nMilliseconds)
+static void ThreadSleep(unsigned long nMilliseconds)
 {
 	::Sleep(nMilliseconds);
 }
 
+// Slots in the ConstantBufferView/ShaderResourceView descriptor heap
+enum CBVSRVIndex_t
+{
+	CBV_LEFT_EYE = 0,
+	CBV_RIGHT_EYE,
+	SRV_LEFT_EYE,
+	SRV_RIGHT_EYE,
+	SRV_TEXTURE_MAP,
+	// Slot for texture in each possible render model
+	SRV_TEXTURE_RENDER_MODEL0,
+	SRV_TEXTURE_RENDER_MODEL_MAX = SRV_TEXTURE_RENDER_MODEL0 + vr::k_unMaxTrackedDeviceCount,
+	// Slot for transform in each possible rendermodel
+	CBV_LEFT_EYE_RENDER_MODEL0,
+	CBV_LEFT_EYE_RENDER_MODEL_MAX = CBV_LEFT_EYE_RENDER_MODEL0 + vr::k_unMaxTrackedDeviceCount,
+	CBV_RIGHT_EYE_RENDER_MODEL0,
+	CBV_RIGHT_EYE_RENDER_MODEL_MAX = CBV_RIGHT_EYE_RENDER_MODEL0 + vr::k_unMaxTrackedDeviceCount,
+	NUM_SRV_CBVS
+};
 class DX12RenderModel
 {
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_pVertexBuffer;
@@ -900,7 +918,7 @@ bool CMainApplication::SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> 
 		nullptr,
 		IID_PPV_ARGS(&m_pTextureUploadHeap));
 
-	UpdateSubresources(pCommandList.Get(), m_pTexture.Get(), m_pTextureUploadHeap.Get(), 0, 0, mipLevelData.size(), &mipLevelData[0]);
+	UpdateSubresources(pCommandList.Get(), m_pTexture.Get(), m_pTextureUploadHeap.Get(), 0, 0, (UINT)mipLevelData.size(), &mipLevelData[0]);
 	pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 	// Free mip pointers
@@ -1000,7 +1018,7 @@ void CMainApplication::SetupScene()
 		}
 		mat = mat * Matrix4().translate(0, -((float)m_iSceneVolumeHeight) * m_fScaleSpacing, m_fScaleSpacing);
 	}
-	m_uiVertcount = vertdataarray.size() / 5;
+	m_uiVertcount = (UINT)vertdataarray.size() / 5;
 
 	m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 											 D3D12_HEAP_FLAG_NONE,
@@ -1017,7 +1035,7 @@ void CMainApplication::SetupScene()
 
 	m_sceneVertexBufferView.BufferLocation = m_pSceneVertexBuffer->GetGPUVirtualAddress();
 	m_sceneVertexBufferView.StrideInBytes = sizeof(VertexDataScene);
-	m_sceneVertexBufferView.SizeInBytes = sizeof(float) * vertdataarray.size();
+	m_sceneVertexBufferView.SizeInBytes = (UINT)(sizeof(float) * vertdataarray.size());
 }
 
 //-----------------------------------------------------------------------------
@@ -1186,7 +1204,7 @@ void CMainApplication::UpdateControllerAxes()
 
 		m_controllerAxisVertexBufferView.BufferLocation = m_pControllerAxisVertexBuffer->GetGPUVirtualAddress();
 		m_controllerAxisVertexBufferView.StrideInBytes = sizeof(float) * 6;
-		m_controllerAxisVertexBufferView.SizeInBytes = sizeof(float) * vertdataarray.size();
+		m_controllerAxisVertexBufferView.SizeInBytes = (UINT)(sizeof(float) * vertdataarray.size());
 	}
 
 	// Update the VB data
@@ -1307,7 +1325,7 @@ void CMainApplication::SetupCompanionWindow()
 
 	m_companionWindowVertexBufferView.BufferLocation = m_pCompanionWindowVertexBuffer->GetGPUVirtualAddress();
 	m_companionWindowVertexBufferView.StrideInBytes = sizeof(VertexDataWindow);
-	m_companionWindowVertexBufferView.SizeInBytes = sizeof(VertexDataWindow) * vVerts.size();
+	m_companionWindowVertexBufferView.SizeInBytes = (UINT)(sizeof(VertexDataWindow) * vVerts.size());
 
 	UINT16 vIndices[] = {0, 1, 3, 0, 3, 2, 4, 5, 7, 4, 7, 6};
 	m_uiCompanionWindowIndexSize = _countof(vIndices);
