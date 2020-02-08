@@ -57,7 +57,6 @@ private:
 
     std::string m_strPoseClasses; // what classes we saw poses for this frame
 
-
     // D3D12 members
     static const int g_nFrameCount = 2; // Swapchain depth
 
@@ -74,18 +73,6 @@ private:
     ComPtr<ID3D12Resource> m_pTextureUploadHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_textureShaderResourceView;
 
-
-    struct FramebufferDesc
-    {
-        ComPtr<ID3D12Resource> m_pTexture;
-        CD3DX12_CPU_DESCRIPTOR_HANDLE m_renderTargetViewHandle;
-        ComPtr<ID3D12Resource> m_pDepthStencil;
-        CD3DX12_CPU_DESCRIPTOR_HANDLE m_depthStencilViewHandle;
-    };
-    FramebufferDesc m_leftEyeDesc;
-    FramebufferDesc m_rightEyeDesc;
-
-    bool CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc, bool isLeft);
 
     uint32_t m_nRenderWidth;
     uint32_t m_nRenderHeight;

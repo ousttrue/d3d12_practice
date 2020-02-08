@@ -39,7 +39,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iScen
     : m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale),
       m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
       m_cbv(new CBV),
-      m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow),
+      m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow(msaa)),
       m_strPoseClasses(""), m_bShowCubes(true)
 {
     memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
@@ -328,11 +328,11 @@ void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCom
         bounds.vMin = 0.0f;
         bounds.vMax = 1.0f;
 
-        vr::D3D12TextureData_t d3d12LeftEyeTexture = {m_leftEyeDesc.m_pTexture.Get(), m_d3d->Queue().Get(), 0};
+        vr::D3D12TextureData_t d3d12LeftEyeTexture = {m_companionWindow->LeftEyeTexture().Get(), m_d3d->Queue().Get(), 0};
         vr::Texture_t leftEyeTexture = {(void *)&d3d12LeftEyeTexture, vr::TextureType_DirectX12, vr::ColorSpace_Gamma};
         vr::VRCompositor()->Submit(vr::Eye_Left, &leftEyeTexture, &bounds, vr::Submit_Default);
 
-        vr::D3D12TextureData_t d3d12RightEyeTexture = {m_rightEyeDesc.m_pTexture.Get(), m_d3d->Queue().Get(), 0};
+        vr::D3D12TextureData_t d3d12RightEyeTexture = {m_companionWindow->RightEyeTexture().Get(), m_d3d->Queue().Get(), 0};
         vr::Texture_t rightEyeTexture = {(void *)&d3d12RightEyeTexture, vr::TextureType_DirectX12, vr::ColorSpace_Gamma};
         vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture, &bounds, vr::Submit_Default);
     }
@@ -688,58 +688,6 @@ bool CMainApplication::SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> 
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Creates a frame buffer. Returns true if the buffer was set up.
-//          Returns false if the setup failed.
-//-----------------------------------------------------------------------------
-bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc, bool isLeft)
-{
-    D3D12_RESOURCE_DESC textureDesc = {};
-    textureDesc.MipLevels = 1;
-    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    textureDesc.Width = nWidth;
-    textureDesc.Height = nHeight;
-    textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    textureDesc.DepthOrArraySize = 1;
-    textureDesc.SampleDesc.Count = m_nMSAASampleCount;
-    textureDesc.SampleDesc.Quality = 0;
-    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-
-    const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-
-    // Create color target
-    m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-                                             D3D12_HEAP_FLAG_NONE,
-                                             &textureDesc,
-                                             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-                                             &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, clearColor),
-                                             IID_PPV_ARGS(&framebufferDesc.m_pTexture));
-
-    auto rtvHandle = m_d3d->RTVHandle(isLeft ? RTVIndex_t::RTV_LEFT_EYE : RTVIndex_t::RTV_RIGHT_EYE);
-    m_d3d->Device()->CreateRenderTargetView(framebufferDesc.m_pTexture.Get(), nullptr, rtvHandle);
-    framebufferDesc.m_renderTargetViewHandle = rtvHandle;
-
-    // Create shader resource view
-    auto srvHandle = m_cbv->CpuHandle(isLeft ? SRV_LEFT_EYE : SRV_RIGHT_EYE);
-    m_d3d->Device()->CreateShaderResourceView(framebufferDesc.m_pTexture.Get(), nullptr, srvHandle);
-
-    // Create depth
-    D3D12_RESOURCE_DESC depthDesc = textureDesc;
-    depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    m_d3d->Device()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-                                             D3D12_HEAP_FLAG_NONE,
-                                             &depthDesc,
-                                             D3D12_RESOURCE_STATE_DEPTH_WRITE,
-                                             &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D32_FLOAT, 1.0f, 0),
-                                             IID_PPV_ARGS(&framebufferDesc.m_pDepthStencil));
-
-    auto dsvHandle = m_d3d->DSVHandle(isLeft ? RTVIndex_t::RTV_LEFT_EYE : RTVIndex_t::RTV_RIGHT_EYE);
-    m_d3d->Device()->CreateDepthStencilView(framebufferDesc.m_pDepthStencil.Get(), nullptr, dsvHandle);
-    framebufferDesc.m_depthStencilViewHandle = dsvHandle;
-    return true;
-}
-
-//-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 bool CMainApplication::SetupStereoRenderTargets()
@@ -747,9 +695,18 @@ bool CMainApplication::SetupStereoRenderTargets()
     m_hmd->Hmd()->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
     m_nRenderWidth = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderWidth);
     m_nRenderHeight = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderHeight);
-
-    CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_leftEyeDesc, true);
-    CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_rightEyeDesc, false);
+    m_companionWindow->CreateFrameBufferLeft(m_d3d->Device(),
+                                             m_nRenderWidth,
+                                             m_nRenderHeight,
+                                             m_d3d->RTVHandle(RTVIndex_t::RTV_LEFT_EYE),
+                                             m_cbv->CpuHandle(SRV_LEFT_EYE),
+                                             m_d3d->DSVHandle(RTVIndex_t::RTV_LEFT_EYE));
+    m_companionWindow->CreateFrameBufferRight(m_d3d->Device(),
+                                              m_nRenderWidth,
+                                              m_nRenderHeight,
+                                              m_d3d->RTVHandle(RTVIndex_t::RTV_RIGHT_EYE),
+                                              m_cbv->CpuHandle(SRV_RIGHT_EYE),
+                                              m_d3d->DSVHandle(RTVIndex_t::RTV_RIGHT_EYE));
     return true;
 }
 
@@ -767,33 +724,16 @@ void CMainApplication::RenderStereoTargets(const ComPtr<ID3D12GraphicsCommandLis
     //----------//
     // Left Eye //
     //----------//
-    // Transition to RENDER_TARGET
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
-    pCommandList->OMSetRenderTargets(1, &m_leftEyeDesc.m_renderTargetViewHandle, FALSE, &m_leftEyeDesc.m_depthStencilViewHandle);
-
-    const float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-    pCommandList->ClearRenderTargetView(m_leftEyeDesc.m_renderTargetViewHandle, clearColor, 0, nullptr);
-    pCommandList->ClearDepthStencilView(m_leftEyeDesc.m_depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
-
+    m_companionWindow->BeginLeft(pCommandList);
     RenderScene(vr::Eye_Left, pCommandList);
-
-    // Transition to SHADER_RESOURCE to submit to SteamVR
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+    m_companionWindow->EndLeft(pCommandList);
 
     //-----------//
     // Right Eye //
     //-----------//
-    // Transition to RENDER_TARGET
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
-    pCommandList->OMSetRenderTargets(1, &m_rightEyeDesc.m_renderTargetViewHandle, FALSE, &m_rightEyeDesc.m_depthStencilViewHandle);
-
-    pCommandList->ClearRenderTargetView(m_rightEyeDesc.m_renderTargetViewHandle, clearColor, 0, nullptr);
-    pCommandList->ClearDepthStencilView(m_rightEyeDesc.m_depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, 0, nullptr);
-
+    m_companionWindow->BeginRight(pCommandList);
     RenderScene(vr::Eye_Right, pCommandList);
-
-    // Transition to SHADER_RESOURCE to submit to SteamVR
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+    m_companionWindow->EndRight(pCommandList);
 }
 
 //-----------------------------------------------------------------------------
