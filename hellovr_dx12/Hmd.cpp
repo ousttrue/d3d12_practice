@@ -37,8 +37,8 @@ HMD::HMD()
     {
         m_rbShowTrackedDevice[nDevice] = true;
     }
-	// other initialization tasks are done in BInit
-	memset(m_rDevClassChar, 0, sizeof(m_rDevClassChar));
+    // other initialization tasks are done in BInit
+    memset(m_rDevClassChar, 0, sizeof(m_rDevClassChar));
 }
 
 HMD::~HMD()
@@ -142,14 +142,14 @@ Matrix4 HMD::GetCurrentViewProjectionMatrix(vr::Hmd_Eye nEye)
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void HMD::UpdateHMDMatrixPose(int &m_iValidPoseCount, std::string &m_strPoseClasses)
+int HMD::UpdateHMDMatrixPose(std::string &m_strPoseClasses)
 {
     if (!m_pHMD)
-        return;
+        return 0;
 
     vr::VRCompositor()->WaitGetPoses(m_rTrackedDevicePose, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
-    m_iValidPoseCount = 0;
+    auto m_iValidPoseCount = 0;
     m_strPoseClasses = "";
     for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; ++nDevice)
     {
@@ -190,6 +190,8 @@ void HMD::UpdateHMDMatrixPose(int &m_iValidPoseCount, std::string &m_strPoseClas
         m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
         m_mat4HMDPose.invert();
     }
+
+    return m_iValidPoseCount;
 }
 void HMD::SetupCameras()
 {

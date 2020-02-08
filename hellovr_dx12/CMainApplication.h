@@ -14,6 +14,7 @@ class CMainApplication
     class DeviceRTV *m_d3d = nullptr;
     class Cubes *m_cubes = nullptr;
     class Models *m_models = nullptr;
+    class Axis *m_axis = nullptr;
     class CBV *m_cbv = nullptr;
 
     template <class T>
@@ -51,10 +52,6 @@ private:
 private:
     int m_nMSAASampleCount;
     float m_flSuperSampleScale;
-    int m_iTrackedControllerCount;
-    int m_iTrackedControllerCount_Last;
-    int m_iValidPoseCount;
-    int m_iValidPoseCount_Last;
     bool m_bShowCubes;
 
     std::string m_strPoseClasses; // what classes we saw poses for this frame
@@ -80,10 +77,7 @@ private:
     D3D12_VERTEX_BUFFER_VIEW m_companionWindowVertexBufferView;
     ComPtr<ID3D12Resource> m_pCompanionWindowIndexBuffer;
     D3D12_INDEX_BUFFER_VIEW m_companionWindowIndexBufferView;
-    ComPtr<ID3D12Resource> m_pControllerAxisVertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_controllerAxisVertexBufferView;
 
-    unsigned int m_uiControllerVertcount;
 
     struct VertexDataWindow
     {

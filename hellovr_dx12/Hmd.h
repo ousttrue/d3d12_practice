@@ -37,7 +37,7 @@ public:
     Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
     Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
     Matrix4 GetCurrentViewProjectionMatrix(vr::Hmd_Eye nEye);
-    void UpdateHMDMatrixPose(int &m_iValidPoseCount, std::string &m_strPoseClasses);
+    int UpdateHMDMatrixPose(std::string &m_strPoseClasses);
     bool PoseIsValid(uint32_t unTrackedDevice);
     bool IsVisible(uint32_t unTrackedDevice) const
     {
