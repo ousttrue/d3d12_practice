@@ -8,6 +8,7 @@ add_executable(${TARGET_NAME}
     Cubes.cpp
     Models.cpp
     GenMipMapRGBA.cpp
+    CompanionWindow.cpp
     dprintf.cpp
     main.cpp
     lodepng.cpp
