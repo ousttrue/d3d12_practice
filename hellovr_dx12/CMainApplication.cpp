@@ -41,7 +41,7 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
 	  m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
 	  m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1),
 	  m_strPoseClasses(""), m_bShowCubes(true),
-	  m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
+	  m_nCBVSRVDescriptorSize(0)
 {
 	memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
 };
@@ -147,21 +147,7 @@ bool CMainApplication::BInitD3D12()
 
 	// Create descriptor heaps
 	{
-		m_nRTVDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		m_nDSVDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 		m_nCBVSRVDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = NUM_RTVS;
-		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		m_pDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_pRTVHeap));
-
-		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = NUM_RTVS;
-		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		m_pDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_pDSVHeap));
 
 		D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {};
 		cbvSrvHeapDesc.NumDescriptors = NUM_SRV_CBVS;
@@ -282,43 +268,13 @@ bool CMainApplication::HandleInput(const ComPtr<ID3D12GraphicsCommandList> &pCom
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-// D3D12 members
-struct FrameResource
-{
-	ComPtr<ID3D12Resource> m_pSwapChainRenderTarget;
-	ComPtr<ID3D12CommandAllocator> m_pCommandAllocator;
-	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
-};
 void CMainApplication::RunMainLoop()
 {
-	FrameResource frames[g_nFrameCount];
-	for (int nFrame = 0; nFrame < g_nFrameCount; nFrame++)
-	{
-		// Create per-frame resources
-		auto &frame = frames[nFrame];
-		if (FAILED(m_d3d->Device()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frame.m_pCommandAllocator))))
-		{
-			dprintf("Failed to create command allocators.\n");
-			return;
-		}
-
-		// Create swapchain render targets
-		m_d3d->Swapchain()->GetBuffer(nFrame, IID_PPV_ARGS(&frame.m_pSwapChainRenderTarget));
-
-		// Create swapchain render target views
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
-		rtvHandle.Offset(RTV_SWAPCHAIN0 + nFrame, m_nRTVDescriptorSize);
-		m_d3d->Device()->CreateRenderTargetView(frame.m_pSwapChainRenderTarget.Get(), nullptr, rtvHandle);
-		m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-										   frame.m_pCommandAllocator.Get(),
-										   m_pScenePipelineState.Get(),
-										   IID_PPV_ARGS(&frame.m_pCommandList));
-	}
-
+	m_d3d->SetupFrameResources(m_pScenePipelineState);
 	bool bQuit = false;
 	while (!bQuit)
 	{
-		auto &frame = frames[m_d3d->FrameIndex()];
+		auto &frame = m_d3d->CurrentFrame();
 		bQuit = HandleInput(frame.m_pCommandList);
 		frame.m_pCommandAllocator->Reset();
 		frame.m_pCommandList->Reset(frame.m_pCommandAllocator.Get(), m_pScenePipelineState.Get());
@@ -1039,7 +995,7 @@ void CMainApplication::UpdateControllerAxes()
 // Purpose: Creates a frame buffer. Returns true if the buffer was set up.
 //          Returns false if the setup failed.
 //-----------------------------------------------------------------------------
-bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc, RTVIndex_t nRTVIndex)
+bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc, bool isLeft)
 {
 	D3D12_RESOURCE_DESC textureDesc = {};
 	textureDesc.MipLevels = 1;
@@ -1062,14 +1018,13 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 											 &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, clearColor),
 											 IID_PPV_ARGS(&framebufferDesc.m_pTexture));
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
-	rtvHandle.Offset(nRTVIndex, m_nRTVDescriptorSize);
+	auto rtvHandle = m_d3d->RTVHandle(isLeft ? RTVIndex_t::RTV_LEFT_EYE : RTVIndex_t::RTV_RIGHT_EYE);
 	m_d3d->Device()->CreateRenderTargetView(framebufferDesc.m_pTexture.Get(), nullptr, rtvHandle);
 	framebufferDesc.m_renderTargetViewHandle = rtvHandle;
 
 	// Create shader resource view
 	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
-	srvHandle.Offset(SRV_LEFT_EYE + nRTVIndex, m_nCBVSRVDescriptorSize);
+	srvHandle.Offset(SRV_LEFT_EYE + (isLeft ? 0 : 1), m_nCBVSRVDescriptorSize);
 	m_d3d->Device()->CreateShaderResourceView(framebufferDesc.m_pTexture.Get(), nullptr, srvHandle);
 
 	// Create depth
@@ -1083,8 +1038,7 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
 											 &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D32_FLOAT, 1.0f, 0),
 											 IID_PPV_ARGS(&framebufferDesc.m_pDepthStencil));
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_pDSVHeap->GetCPUDescriptorHandleForHeapStart());
-	dsvHandle.Offset(nRTVIndex, m_nDSVDescriptorSize);
+	auto dsvHandle = m_d3d->DSVHandle(isLeft ? RTVIndex_t::RTV_LEFT_EYE : RTVIndex_t::RTV_RIGHT_EYE);
 	m_d3d->Device()->CreateDepthStencilView(framebufferDesc.m_pDepthStencil.Get(), nullptr, dsvHandle);
 	framebufferDesc.m_depthStencilViewHandle = dsvHandle;
 	return true;
@@ -1102,8 +1056,8 @@ bool CMainApplication::SetupStereoRenderTargets()
 	m_nRenderWidth = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderWidth);
 	m_nRenderHeight = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderHeight);
 
-	CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_leftEyeDesc, RTV_LEFT_EYE);
-	CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_rightEyeDesc, RTV_RIGHT_EYE);
+	CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_leftEyeDesc, true);
+	CreateFrameBuffer(m_nRenderWidth, m_nRenderHeight, m_rightEyeDesc, false);
 	return true;
 }
 
@@ -1284,8 +1238,7 @@ void CMainApplication::RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandL
 			   D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// Bind current swapchain image
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRTVHeap->GetCPUDescriptorHandleForHeapStart());
-	rtvHandle.Offset(RTV_SWAPCHAIN0 + m_d3d->FrameIndex(), m_nRTVDescriptorSize);
+	auto rtvHandle = m_d3d->RTVHandleCurrent();
 	pCommandList->OMSetRenderTargets(1, &rtvHandle, 0, nullptr);
 
 	auto w = m_sdl->Width();

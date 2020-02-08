@@ -6,16 +6,6 @@
 #include "d3dx12.h"
 #include "Matrices.h"
 
-// Slots in the RenderTargetView descriptor heap
-enum RTVIndex_t
-{
-    RTV_LEFT_EYE = 0,
-    RTV_RIGHT_EYE,
-    RTV_SWAPCHAIN0,
-    RTV_SWAPCHAIN1,
-    NUM_RTVS
-};
-
 // Slots in the ConstantBufferView/ShaderResourceView descriptor heap
 enum CBVSRVIndex_t
 {
@@ -108,8 +98,6 @@ private:
     static const int g_nFrameCount = 2; // Swapchain depth
 
     ComPtr<ID3D12DescriptorHeap> m_pCBVSRVHeap;
-    ComPtr<ID3D12DescriptorHeap> m_pRTVHeap;
-    ComPtr<ID3D12DescriptorHeap> m_pDSVHeap;
     ComPtr<ID3D12RootSignature> m_pRootSignature;
     ComPtr<ID3D12PipelineState> m_pScenePipelineState;
     ComPtr<ID3D12PipelineState> m_pCompanionPipelineState;
@@ -118,8 +106,6 @@ private:
     ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
     D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2];
     UINT8 *m_pSceneConstantBufferData[2];
-    UINT m_nRTVDescriptorSize;
-    UINT m_nDSVDescriptorSize;
     UINT m_nCBVSRVDescriptorSize;
 
     ComPtr<ID3D12Resource> m_pSceneVertexBuffer;
@@ -160,7 +146,7 @@ private:
     FramebufferDesc m_leftEyeDesc;
     FramebufferDesc m_rightEyeDesc;
 
-    bool CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc, RTVIndex_t nRTVIndex);
+    bool CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc, bool isLeft);
 
     uint32_t m_nRenderWidth;
     uint32_t m_nRenderHeight;
