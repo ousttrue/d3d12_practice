@@ -208,20 +208,35 @@ bool CMainApplication::BInitD3D12()
 		return false;
 
 	// Create command list
-	m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pCommandAllocators[m_d3d->FrameIndex()].Get(), m_pScenePipelineState.Get(), IID_PPV_ARGS(&m_pCommandList));
+	{
+		ComPtr<ID3D12CommandAllocator> pAllocator;
+		if (FAILED(m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&pAllocator))))
+		{
+			return false;
+		}
 
-	SetupTexturemaps(m_pCommandList);
-	SetupScene();
-	m_hmd->SetupCameras();
-	SetupStereoRenderTargets();
-	SetupCompanionWindow();
-	SetupRenderModels(m_pCommandList);
+		ComPtr<ID3D12GraphicsCommandList> pCommandList;
+		if (FAILED(m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+													  pAllocator.Get(),
+													  nullptr,
+													  IID_PPV_ARGS(&pCommandList))))
+		{
+			return false;
+		}
 
-	// Do any work that was queued up during loading
-	m_pCommandList->Close();
+		SetupTexturemaps(pCommandList);
+		SetupScene();
+		m_hmd->SetupCameras();
+		SetupStereoRenderTargets();
+		SetupCompanionWindow();
+		SetupRenderModels(pCommandList);
 
-	m_d3d->Execute(m_pCommandList);
-	m_d3d->Sync();
+		// Do any work that was queued up during loading
+		pCommandList->Close();
+
+		m_d3d->Execute(pCommandList);
+		m_d3d->Sync();
+	}
 
 	return true;
 }
@@ -268,6 +283,12 @@ bool CMainApplication::HandleInput()
 //-----------------------------------------------------------------------------
 void CMainApplication::RunMainLoop()
 {
+	ComPtr<ID3D12GraphicsCommandList> pCommandList;
+	m_d3d->Device()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+									   m_pCommandAllocators[m_d3d->FrameIndex()].Get(),
+									   m_pScenePipelineState.Get(),
+									   IID_PPV_ARGS(&m_pCommandList));
+
 	bool bQuit = false;
 	while (!bQuit)
 	{
