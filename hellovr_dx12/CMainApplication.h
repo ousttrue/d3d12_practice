@@ -14,6 +14,7 @@ class CMainApplication
     class DeviceRTV *m_d3d = nullptr;
     class Cubes *m_cubes = nullptr;
     class Models *m_models = nullptr;
+    class CBV *m_cbv = nullptr;
 
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -63,7 +64,6 @@ private:
     // D3D12 members
     static const int g_nFrameCount = 2; // Swapchain depth
 
-    ComPtr<ID3D12DescriptorHeap> m_pCBVSRVHeap;
     ComPtr<ID3D12RootSignature> m_pRootSignature;
     ComPtr<ID3D12PipelineState> m_pScenePipelineState;
     ComPtr<ID3D12PipelineState> m_pCompanionPipelineState;
@@ -72,7 +72,6 @@ private:
     ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
     D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2];
     UINT8 *m_pSceneConstantBufferData[2];
-    UINT m_nCBVSRVDescriptorSize;
 
     ComPtr<ID3D12Resource> m_pTexture;
     ComPtr<ID3D12Resource> m_pTextureUploadHeap;

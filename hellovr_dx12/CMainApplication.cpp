@@ -36,11 +36,11 @@ using Microsoft::WRL::ComPtr;
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iSceneVolumeInit)
     : m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale),
       m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
+      m_cbv(new CBV),
       m_models(new Models), m_cubes(new Cubes(iSceneVolumeInit)),
       m_iTrackedControllerCount(0),
       m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1),
-      m_strPoseClasses(""), m_bShowCubes(true),
-      m_nCBVSRVDescriptorSize(0)
+      m_strPoseClasses(""), m_bShowCubes(true)
 {
     memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
 };
@@ -52,6 +52,7 @@ CMainApplication::~CMainApplication()
 {
     delete m_models;
     delete m_cubes;
+    delete m_cbv;
     delete m_d3d;
     delete m_hmd;
     delete m_sdl;
@@ -112,6 +113,11 @@ bool CMainApplication::Initialize(bool bDebugD3D12)
         return false;
     }
 
+    if (!m_cbv->Initialize(m_d3d->Device()))
+    {
+        return false;
+    }
+
     if (!BInitD3D12())
     {
         dprintf("%s - Unable to initialize D3D12!\n", __FUNCTION__);
@@ -137,17 +143,6 @@ bool CMainApplication::BInitD3D12()
 {
     auto m_pDevice = m_d3d->Device();
 
-    // Create descriptor heaps
-    {
-        m_nCBVSRVDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-        D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {};
-        cbvSrvHeapDesc.NumDescriptors = NUM_SRV_CBVS;
-        cbvSrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        cbvSrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        m_pDevice->CreateDescriptorHeap(&cbvSrvHeapDesc, IID_PPV_ARGS(&m_pCBVSRVHeap));
-    }
-
     // Create constant buffer
     {
         m_pDevice->CreateCommittedResource(
@@ -167,17 +162,16 @@ bool CMainApplication::BInitD3D12()
         m_pSceneConstantBufferData[1] = pBuffer + 256;
 
         // Left eye CBV
-        CD3DX12_CPU_DESCRIPTOR_HANDLE cbvLeftEyeHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
-        cbvLeftEyeHandle.Offset(CBV_LEFT_EYE, m_nCBVSRVDescriptorSize);
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-        cbvDesc.BufferLocation = m_pSceneConstantBuffer->GetGPUVirtualAddress();
-        cbvDesc.SizeInBytes = (sizeof(Matrix4) + 255) & ~255; // Pad to 256 bytes
+        auto cbvLeftEyeHandle = m_cbv->CpuHandle(CBV_LEFT_EYE);
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {
+            .BufferLocation = m_pSceneConstantBuffer->GetGPUVirtualAddress(),
+            .SizeInBytes = (sizeof(Matrix4) + 255) & ~255, // Pad to 256 bytes
+        };
         m_pDevice->CreateConstantBufferView(&cbvDesc, cbvLeftEyeHandle);
         m_sceneConstantBufferView[0] = cbvLeftEyeHandle;
 
         // Right eye CBV
-        CD3DX12_CPU_DESCRIPTOR_HANDLE cbvRightEyeHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
-        cbvRightEyeHandle.Offset(CBV_RIGHT_EYE, m_nCBVSRVDescriptorSize);
+        auto cbvRightEyeHandle = m_cbv->CpuHandle(CBV_RIGHT_EYE);
         cbvDesc.BufferLocation += 256;
         m_pDevice->CreateConstantBufferView(&cbvDesc, cbvRightEyeHandle);
         m_sceneConstantBufferView[1] = cbvRightEyeHandle;
@@ -214,7 +208,7 @@ bool CMainApplication::BInitD3D12()
         SetupCompanionWindow();
         if (m_hmd->Hmd())
         {
-            m_models->SetupRenderModels(m_hmd, m_d3d->Device(), m_pCBVSRVHeap, pCommandList);
+            m_models->SetupRenderModels(m_hmd, m_d3d->Device(), m_cbv->Heap(), pCommandList);
         }
 
         // Do any work that was queued up during loading
@@ -290,7 +284,7 @@ void CMainApplication::ProcessVREvent(const vr::VREvent_t &event, const ComPtr<I
     {
     case vr::VREvent_TrackedDeviceActivated:
     {
-        m_models->SetupRenderModelForTrackedDevice(m_hmd, m_d3d->Device(), m_pCBVSRVHeap, pCommandList, event.trackedDeviceIndex);
+        m_models->SetupRenderModelForTrackedDevice(m_hmd, m_d3d->Device(), m_cbv->Heap(), pCommandList, event.trackedDeviceIndex);
         dprintf("Device %u attached. Setting up render model.\n", event.trackedDeviceIndex);
     }
     break;
@@ -315,7 +309,7 @@ void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCom
     if (m_hmd->Hmd())
     {
         pCommandList->SetGraphicsRootSignature(m_pRootSignature.Get());
-        pCommandList->SetDescriptorHeaps(1, m_pCBVSRVHeap.GetAddressOf());
+        pCommandList->SetDescriptorHeaps(1, m_cbv->Heap().GetAddressOf());
 
         UpdateControllerAxes();
         RenderStereoTargets(pCommandList);
@@ -674,8 +668,7 @@ bool CMainApplication::SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> 
                                              IID_PPV_ARGS(&m_pTexture));
 
     // Create shader resource view
-    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
-    srvHandle.Offset(SRV_TEXTURE_MAP, m_nCBVSRVDescriptorSize);
+    auto srvHandle = m_cbv->CpuHandle(SRV_TEXTURE_MAP);
     m_d3d->Device()->CreateShaderResourceView(m_pTexture.Get(), nullptr, srvHandle);
     m_textureShaderResourceView = srvHandle;
 
@@ -841,8 +834,7 @@ bool CMainApplication::CreateFrameBuffer(int nWidth, int nHeight, FramebufferDes
     framebufferDesc.m_renderTargetViewHandle = rtvHandle;
 
     // Create shader resource view
-    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
-    srvHandle.Offset(SRV_LEFT_EYE + (isLeft ? 0 : 1), m_nCBVSRVDescriptorSize);
+    auto srvHandle = m_cbv->CpuHandle(isLeft ? SRV_LEFT_EYE : SRV_RIGHT_EYE);
     m_d3d->Device()->CreateShaderResourceView(framebufferDesc.m_pTexture.Get(), nullptr, srvHandle);
 
     // Create depth
@@ -990,13 +982,11 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12Graphics
         pCommandList->SetPipelineState(m_pScenePipelineState.Get());
 
         // Select the CBV (left or right eye)
-        CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
-        cbvHandle.Offset(nEye, m_nCBVSRVDescriptorSize);
+        auto cbvHandle = m_cbv->GpuHandle((CBVSRVIndex_t)nEye);
         pCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
 
         // SRV is just after the left eye
-        CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
-        srvHandle.Offset(SRV_TEXTURE_MAP, m_nCBVSRVDescriptorSize);
+        auto srvHandle = m_cbv->GpuHandle(SRV_TEXTURE_MAP);
         pCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
 
         // Update the persistently mapped pointer to the CB data with the latest matrix
@@ -1062,19 +1052,17 @@ void CMainApplication::RenderCompanionWindow(const ComPtr<ID3D12GraphicsCommandL
     pCommandList->RSSetViewports(1, &viewport);
     pCommandList->RSSetScissorRects(1, &scissor);
 
-    // render left eye (first half of index array)
-    CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandleLeftEye(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
-    srvHandleLeftEye.Offset(SRV_LEFT_EYE, m_nCBVSRVDescriptorSize);
-    pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleLeftEye);
-
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     pCommandList->IASetVertexBuffers(0, 1, &m_companionWindowVertexBufferView);
     pCommandList->IASetIndexBuffer(&m_companionWindowIndexBufferView);
+
+    // render left eye (first half of index array)
+    auto srvHandleLeftEye = m_cbv->GpuHandle(SRV_LEFT_EYE);
+    pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleLeftEye);
     pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, 0, 0, 0);
 
     // render right eye (second half of index array)
-    CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandleRightEye(m_pCBVSRVHeap->GetGPUDescriptorHandleForHeapStart());
-    srvHandleRightEye.Offset(SRV_RIGHT_EYE, m_nCBVSRVDescriptorSize);
+    auto srvHandleRightEye = m_cbv->GpuHandle(SRV_RIGHT_EYE);
     pCommandList->SetGraphicsRootDescriptorTable(1, srvHandleRightEye);
     pCommandList->DrawIndexedInstanced(m_uiCompanionWindowIndexSize / 2, 1, (m_uiCompanionWindowIndexSize / 2), 0, 0);
 
