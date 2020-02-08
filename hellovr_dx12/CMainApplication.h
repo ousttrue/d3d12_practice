@@ -38,7 +38,7 @@ enum CBVSRVIndex_t
 class CMainApplication
 {
     class HMD *m_hmd = nullptr;
-    class D3D *m_d3d = nullptr;
+    class DeviceRTV *m_d3d = nullptr;
 
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;

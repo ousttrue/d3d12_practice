@@ -5,6 +5,7 @@ add_executable(${TARGET_NAME}
     SDLApplication.cpp
     Commandline.cpp
     Hmd.cpp
+    DeviceRTV.cpp
     dprintf.cpp
     main.cpp
     lodepng.cpp

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string>
 #include <cstdlib>
+#include "DeviceRTV.h"
 
 #include "lodepng.h"
 #include "pathtools.h"
@@ -32,13 +33,12 @@ void ThreadSleep(unsigned long nMilliseconds)
 	::Sleep(nMilliseconds);
 }
 
-#include "d3ddevice.h"
-
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale)
-	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale), m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new D3D(g_nFrameCount)),
+	: m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale),
+	  m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
 	  m_iTrackedControllerCount(0), m_iTrackedControllerCount_Last(-1), m_iValidPoseCount(0), m_iValidPoseCount_Last(-1),
 	  m_strPoseClasses(""), m_bShowCubes(true),
 	  m_nRTVDescriptorSize(0), m_nCBVSRVDescriptorSize(0), m_nDSVDescriptorSize(0)
@@ -60,6 +60,25 @@ CMainApplication::~CMainApplication()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
+static ComPtr<IDXGIFactory4> CreateFactory(bool isDebug)
+{
+	UINT flag = 0;
+	if (isDebug)
+	{
+		ComPtr<ID3D12Debug> debug;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
+		{
+			debug->EnableDebugLayer();
+			flag |= DXGI_CREATE_FACTORY_DEBUG;
+		}
+	}
+	ComPtr<IDXGIFactory4> factory;
+	if (FAILED(CreateDXGIFactory2(flag, IID_PPV_ARGS(&factory))))
+	{
+		return nullptr;
+	}
+	return factory;
+}
 bool CMainApplication::BInit(bool bDebugD3D12, int iSceneVolumeInit)
 {
 	// Loading the SteamVR Runtime
