@@ -7,20 +7,21 @@
 #include "Matrices.h"
 
 
-
 class CMainApplication
 {
+    class SDLApplication *m_sdl = nullptr;
     class HMD *m_hmd = nullptr;
     class DeviceRTV *m_d3d = nullptr;
+    class Cubes *m_cubes = nullptr;
 
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 public:
-    CMainApplication(int msaa, float flSuperSampleScale);
+    CMainApplication(int msaa, float flSuperSampleScale, int volume);
     virtual ~CMainApplication();
 
-    bool BInit(bool bDebugD3D12, int iSceneVolumeInit);
+    bool Initialize(bool bDebugD3D12);
     void RunMainLoop();
     static void GenMipMapRGBA(const UINT8 *pSrc, UINT8 **ppDst, int nSrcWidth, int nSrcHeight, int *pDstWidthOut, int *pDstHeightOut);
 
@@ -55,11 +56,6 @@ private:
 private:
     int m_nMSAASampleCount;
     float m_flSuperSampleScale;
-
-private: // SDL bookkeeping
-    class SDLApplication *m_sdl = nullptr;
-
-private:
     int m_iTrackedControllerCount;
     int m_iTrackedControllerCount_Last;
     int m_iValidPoseCount;
@@ -68,13 +64,7 @@ private:
 
     std::string m_strPoseClasses; // what classes we saw poses for this frame
 
-    int m_iSceneVolumeWidth;
-    int m_iSceneVolumeHeight;
-    int m_iSceneVolumeDepth;
-    float m_fScaleSpacing;
-    float m_fScale;
 
-    unsigned int m_uiVertcount;
     unsigned int m_uiCompanionWindowIndexSize;
 
     // D3D12 members
@@ -91,8 +81,6 @@ private:
     UINT8 *m_pSceneConstantBufferData[2];
     UINT m_nCBVSRVDescriptorSize;
 
-    ComPtr<ID3D12Resource> m_pSceneVertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_sceneVertexBufferView;
     ComPtr<ID3D12Resource> m_pTexture;
     ComPtr<ID3D12Resource> m_pTextureUploadHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_textureShaderResourceView;
@@ -104,12 +92,6 @@ private:
     D3D12_VERTEX_BUFFER_VIEW m_controllerAxisVertexBufferView;
 
     unsigned int m_uiControllerVertcount;
-
-    struct VertexDataScene
-    {
-        Vector3 position;
-        Vector2 texCoord;
-    };
 
     struct VertexDataWindow
     {

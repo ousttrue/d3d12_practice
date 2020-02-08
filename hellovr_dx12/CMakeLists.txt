@@ -5,6 +5,7 @@ add_executable(${TARGET_NAME}
     Commandline.cpp
     Hmd.cpp
     DeviceRTV.cpp
+    Cubes.cpp
     dprintf.cpp
     main.cpp
     lodepng.cpp
