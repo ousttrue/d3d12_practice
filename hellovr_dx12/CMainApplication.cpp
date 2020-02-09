@@ -42,7 +42,6 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iScen
       m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow(msaa, flSuperSampleScale)),
       m_strPoseClasses(""), m_bShowCubes(true)
 {
-    memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
 };
 
 //-----------------------------------------------------------------------------
