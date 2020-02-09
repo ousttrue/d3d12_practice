@@ -20,11 +20,9 @@ class CMainApplication
     std::unique_ptr<class CBV> m_cbv;
     std::unique_ptr<class CompanionWindow> m_companionWindow;
     std::unique_ptr<class Pipeline> m_pipeline;
-    bool m_bShowCubes;
+    std::unique_ptr<class Texture> m_texture;
+    bool m_bShowCubes = false;
     std::string m_strPoseClasses; // what classes we saw poses for this frame
-    ComPtr<ID3D12Resource> m_pTexture;
-    ComPtr<ID3D12Resource> m_pTextureUploadHeap;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_textureShaderResourceView;
 
 public:
     CMainApplication(int msaa, float flSuperSampleScale, int volume);
@@ -38,6 +36,5 @@ private:
     bool HandleInput(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void ProcessVREvent(const vr::VREvent_t &event, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv);
-    bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
 };

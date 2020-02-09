@@ -11,6 +11,7 @@ add_executable(${TARGET_NAME}
     CompanionWindow.cpp
     Pipeline.cpp
     CBV.cpp
+    Texture.cpp
     #
     dprintf.cpp
     main.cpp
