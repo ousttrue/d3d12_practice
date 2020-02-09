@@ -93,7 +93,9 @@ public:
     {
         RECT rect;
         GetClientRect(hWnd, &rect);
-        SetSwapchainSize(rect.right - rect.left, rect.bottom - rect.top);
+        auto w = rect.right - rect.left;
+        auto h = rect.bottom - rect.top;
+        m_builder.SetSize(w, h);
 
         auto factory = CreateFactory();
         // create deice and device queue
@@ -109,14 +111,10 @@ public:
         return true;
     }
 
-    void SetSwapchainSize(int w, int h)
-    {
-        // TODO: update swapchain
-        m_builder.SetSize(w, h);
-    }
-
     void Render()
     {
+        // m_swapchain.Wait();
+
         // Record all the commands we need to render the scene into the command list.
         auto commandList = m_builder.PopulateCommandList(
             m_swapchain.CurrentRTV(), m_swapchain.CurrentHandle());
@@ -177,11 +175,6 @@ void D3D12HelloTriangle::Render()
 {
     m_impl->Render();
 }
-
-// void D3D12HelloTriangle::SetSwapchainSize(int w, int h)
-// {
-//     m_impl->SetSwapchainSize(w, h);
-// }
 
 bool D3D12HelloTriangle::Initialize(void *hWnd)
 {

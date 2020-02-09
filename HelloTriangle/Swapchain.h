@@ -17,6 +17,7 @@ class Swapchain
     UINT m_rtvDescriptorSize = 0;
     std::vector<ComPtr<ID3D12Resource>> m_renderTargets;
     UINT m_frameCount;
+    HANDLE m_swapChainEvent = NULL;
 
 public:
     Swapchain(UINT frameCount)
@@ -31,6 +32,7 @@ public:
                     HWND hWnd, UINT w, UINT h);
     void CreateRenderTargets(const ComPtr<ID3D12Device> &device);
     void Present();
+    // void Wait();
 
 public:
     const ComPtr<ID3D12Resource> &CurrentRTV() const

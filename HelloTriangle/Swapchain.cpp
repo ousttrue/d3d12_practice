@@ -34,6 +34,7 @@ void Swapchain::Initialize(const ComPtr<IDXGIFactory4> &factory,
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // m_swapChain->SetMaximumFrameLatency(1);
+    // m_swapChainEvent = m_swapChain->GetFrameLatencyWaitableObject();
 }
 
 void Swapchain::CreateRenderTargets(const ComPtr<ID3D12Device> &device)
@@ -71,3 +72,9 @@ void Swapchain::Present()
     ThrowIfFailed(m_swapChain->Present(1, 0));
     UpdateFrameIndex();
 }
+
+// void Swapchain::Wait()
+// {
+//    // Wait for the previous Present to complete.
+//     WaitForSingleObjectEx(m_swapChainEvent, 100, FALSE);
+// }
