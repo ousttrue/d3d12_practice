@@ -36,10 +36,10 @@ using Microsoft::WRL::ComPtr;
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iSceneVolumeInit)
-    : m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale),
+    : m_nMSAASampleCount(msaa),
       m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
       m_cbv(new CBV),
-      m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow(msaa)),
+      m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow(msaa, flSuperSampleScale)),
       m_strPoseClasses(""), m_bShowCubes(true)
 {
     memset(m_pSceneConstantBufferData, 0, sizeof(m_pSceneConstantBufferData));
@@ -205,10 +205,20 @@ bool CMainApplication::BInitD3D12()
             m_cubes->SetupScene(m_d3d->Device());
         }
         m_hmd->SetupCameras();
+
         if (m_hmd->Hmd())
         {
-            SetupStereoRenderTargets();
-            m_companionWindow->SetupCompanionWindow(m_d3d->Device());
+            uint32_t width, height;
+            m_hmd->Hmd()->GetRecommendedRenderTargetSize(&width, &height);
+
+            m_companionWindow->SetupCompanionWindow(m_d3d->Device(), width, height,
+                                                    m_d3d->RTVHandle(RTVIndex_t::RTV_LEFT_EYE),
+                                                    m_cbv->CpuHandle(SRV_LEFT_EYE),
+                                                    m_d3d->DSVHandle(RTVIndex_t::RTV_LEFT_EYE),
+                                                    m_d3d->RTVHandle(RTVIndex_t::RTV_RIGHT_EYE),
+                                                    m_cbv->CpuHandle(SRV_RIGHT_EYE),
+                                                    m_d3d->DSVHandle(RTVIndex_t::RTV_RIGHT_EYE));
+
             m_models->SetupRenderModels(m_hmd, m_d3d->Device(), m_cbv->Heap(), pCommandList);
         }
 
@@ -318,25 +328,14 @@ void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCom
         m_axis->UpdateControllerAxes(m_hmd, m_d3d->Device());
 
         {
-            ////////////////
             // RENDER
-            ////////////////
-            D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nRenderWidth, (FLOAT)m_nRenderHeight, 0.0f, 1.0f};
-            D3D12_RECT scissor = {0, 0, (LONG)m_nRenderWidth, (LONG)m_nRenderHeight};
 
-            pCommandList->RSSetViewports(1, &viewport);
-            pCommandList->RSSetScissorRects(1, &scissor);
-
-            //----------//
             // Left Eye //
-            //----------//
             m_companionWindow->BeginLeft(pCommandList);
             RenderScene(vr::Eye_Left, pCommandList);
             m_companionWindow->EndLeft(pCommandList);
 
-            //-----------//
             // Right Eye //
-            //-----------//
             m_companionWindow->BeginRight(pCommandList);
             RenderScene(vr::Eye_Right, pCommandList);
             m_companionWindow->EndRight(pCommandList);
@@ -745,29 +744,6 @@ bool CMainApplication::SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> 
     {
         delete[] mipLevelData[nMip].pData;
     }
-    return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-bool CMainApplication::SetupStereoRenderTargets()
-{
-    m_hmd->Hmd()->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
-    m_nRenderWidth = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderWidth);
-    m_nRenderHeight = (uint32_t)(m_flSuperSampleScale * (float)m_nRenderHeight);
-    m_companionWindow->CreateFrameBufferLeft(m_d3d->Device(),
-                                             m_nRenderWidth,
-                                             m_nRenderHeight,
-                                             m_d3d->RTVHandle(RTVIndex_t::RTV_LEFT_EYE),
-                                             m_cbv->CpuHandle(SRV_LEFT_EYE),
-                                             m_d3d->DSVHandle(RTVIndex_t::RTV_LEFT_EYE));
-    m_companionWindow->CreateFrameBufferRight(m_d3d->Device(),
-                                              m_nRenderWidth,
-                                              m_nRenderHeight,
-                                              m_d3d->RTVHandle(RTVIndex_t::RTV_RIGHT_EYE),
-                                              m_cbv->CpuHandle(SRV_RIGHT_EYE),
-                                              m_d3d->DSVHandle(RTVIndex_t::RTV_RIGHT_EYE));
     return true;
 }
 

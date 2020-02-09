@@ -7,6 +7,12 @@ class CompanionWindow
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    float m_flSuperSampleScale;
+    int m_nMSAASampleCount;
+
+    UINT32 m_nRenderWidth = 0;
+    UINT32 m_nRenderHeight = 0;
+
     ComPtr<ID3D12Resource> m_pCompanionWindowVertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_companionWindowVertexBufferView;
     ComPtr<ID3D12Resource> m_pCompanionWindowIndexBuffer;
@@ -14,7 +20,6 @@ class CompanionWindow
 
     unsigned int m_uiCompanionWindowIndexSize = 0;
 
-    int m_nMSAASampleCount = 0;
     struct FramebufferDesc
     {
         ComPtr<ID3D12Resource> m_pTexture;
@@ -26,8 +31,8 @@ class CompanionWindow
     FramebufferDesc m_rightEyeDesc = {};
 
 public:
-    CompanionWindow(int msaa)
-        : m_nMSAASampleCount(msaa)
+    CompanionWindow(int msaa, float flSuperSampleScale)
+        : m_nMSAASampleCount(msaa), m_flSuperSampleScale(flSuperSampleScale)
     {
     }
 
@@ -39,27 +44,22 @@ public:
     {
         return m_rightEyeDesc.m_pTexture;
     }
-    bool CreateFrameBuffer(const ComPtr<ID3D12Device> &device, int nWidth, int nHeight,
+
+private:
+    bool CreateFrameBuffer(const ComPtr<ID3D12Device> &device,
                            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle,
                            D3D12_CPU_DESCRIPTOR_HANDLE srvHandle,
                            D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle,
                            FramebufferDesc &framebufferDesc);
-    bool CreateFrameBufferLeft(const ComPtr<ID3D12Device> &device, int nWidth, int nHeight,
-                               D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle,
-                               D3D12_CPU_DESCRIPTOR_HANDLE srvHandle,
-                               D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle)
-    {
-        return CreateFrameBuffer(device, nWidth, nHeight, rtvHandle, srvHandle, dsvHandle, m_leftEyeDesc);
-    }
-    bool CreateFrameBufferRight(const ComPtr<ID3D12Device> &device, int nWidth, int nHeight,
-                                D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle,
-                                D3D12_CPU_DESCRIPTOR_HANDLE srvHandle,
-                                D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle)
-    {
-        return CreateFrameBuffer(device, nWidth, nHeight, rtvHandle, srvHandle, dsvHandle, m_rightEyeDesc);
-    }
 
-    void SetupCompanionWindow(const ComPtr<ID3D12Device> &device);
+public:
+    void SetupCompanionWindow(const ComPtr<ID3D12Device> &device, UINT32 width, UINT32 height,
+                              D3D12_CPU_DESCRIPTOR_HANDLE leftRtvHandle,
+                              D3D12_CPU_DESCRIPTOR_HANDLE leftSrvHandle,
+                              D3D12_CPU_DESCRIPTOR_HANDLE leftDsvHandle,
+                              D3D12_CPU_DESCRIPTOR_HANDLE rightRtvHandle,
+                              D3D12_CPU_DESCRIPTOR_HANDLE rightSrvHandle,
+                              D3D12_CPU_DESCRIPTOR_HANDLE rightDsvHandle);
     void Draw(const ComPtr<ID3D12GraphicsCommandList> &pCommandList,
               D3D12_GPU_DESCRIPTOR_HANDLE srvHandleLeftEye,
               D3D12_GPU_DESCRIPTOR_HANDLE srvHandleRightEye);

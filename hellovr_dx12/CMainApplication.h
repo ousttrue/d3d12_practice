@@ -34,13 +34,11 @@ private:
     void ProcessVREvent(const vr::VREvent_t &event, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv);
     bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
-    bool SetupStereoRenderTargets();
     void RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     bool CreateAllShaders();
 
 private:
     int m_nMSAASampleCount;
-    float m_flSuperSampleScale;
     bool m_bShowCubes;
 
     std::string m_strPoseClasses; // what classes we saw poses for this frame
@@ -60,8 +58,4 @@ private:
     ComPtr<ID3D12Resource> m_pTexture;
     ComPtr<ID3D12Resource> m_pTextureUploadHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_textureShaderResourceView;
-
-
-    uint32_t m_nRenderWidth;
-    uint32_t m_nRenderHeight;
 };

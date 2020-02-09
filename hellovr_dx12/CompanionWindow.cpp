@@ -11,8 +11,22 @@ struct VertexDataWindow
     VertexDataWindow(const Vector2 &pos, const Vector2 tex) : position(pos), texCoord(tex) {}
 };
 
-void CompanionWindow::SetupCompanionWindow(const ComPtr<ID3D12Device> &device)
+void CompanionWindow::SetupCompanionWindow(const ComPtr<ID3D12Device> &device, UINT32 width, UINT32 height,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE leftRtvHandle,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE leftSrvHandle,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE leftDsvHandle,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE rightRtvHandle,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE rightSrvHandle,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE rightDsvHandle)
 {
+    m_nRenderWidth = (uint32_t)(m_flSuperSampleScale * (float)width);
+    m_nRenderHeight = (uint32_t)(m_flSuperSampleScale * (float)height);
+
+    CreateFrameBuffer(device, leftRtvHandle, leftSrvHandle, leftDsvHandle, m_leftEyeDesc);
+    CreateFrameBuffer(device, rightRtvHandle, rightSrvHandle, rightDsvHandle, m_rightEyeDesc);
+
+    //
+
     std::vector<VertexDataWindow> vVerts;
 
     // left eye verts
@@ -84,7 +98,6 @@ void CompanionWindow::Draw(const ComPtr<ID3D12GraphicsCommandList> &pCommandList
 //          Returns false if the setup failed.
 //-----------------------------------------------------------------------------
 bool CompanionWindow::CreateFrameBuffer(const ComPtr<ID3D12Device> &device,
-                                        int nWidth, int nHeight,
                                         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle,
                                         D3D12_CPU_DESCRIPTOR_HANDLE srvHandle,
                                         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle,
@@ -93,8 +106,8 @@ bool CompanionWindow::CreateFrameBuffer(const ComPtr<ID3D12Device> &device,
     D3D12_RESOURCE_DESC textureDesc = {};
     textureDesc.MipLevels = 1;
     textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    textureDesc.Width = nWidth;
-    textureDesc.Height = nHeight;
+    textureDesc.Width = m_nRenderWidth;
+    textureDesc.Height = m_nRenderHeight;
     textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     textureDesc.DepthOrArraySize = 1;
     textureDesc.SampleDesc.Count = m_nMSAASampleCount;
@@ -135,6 +148,12 @@ bool CompanionWindow::CreateFrameBuffer(const ComPtr<ID3D12Device> &device,
 
 void CompanionWindow::BeginLeft(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nRenderWidth, (FLOAT)m_nRenderHeight, 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, (LONG)m_nRenderWidth, (LONG)m_nRenderHeight};
+
+    pCommandList->RSSetViewports(1, &viewport);
+    pCommandList->RSSetScissorRects(1, &scissor);
+
     // Transition to RENDER_TARGET
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_leftEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
     pCommandList->OMSetRenderTargets(1, &m_leftEyeDesc.m_renderTargetViewHandle, FALSE, &m_leftEyeDesc.m_depthStencilViewHandle);
@@ -152,6 +171,12 @@ void CompanionWindow::EndLeft(const ComPtr<ID3D12GraphicsCommandList> &pCommandL
 
 void CompanionWindow::BeginRight(const ComPtr<ID3D12GraphicsCommandList> &pCommandList)
 {
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, (FLOAT)m_nRenderWidth, (FLOAT)m_nRenderHeight, 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, (LONG)m_nRenderWidth, (LONG)m_nRenderHeight};
+
+    pCommandList->RSSetViewports(1, &viewport);
+    pCommandList->RSSetScissorRects(1, &scissor);
+
     // Transition to RENDER_TARGET
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_rightEyeDesc.m_pTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
     pCommandList->OMSetRenderTargets(1, &m_rightEyeDesc.m_renderTargetViewHandle, FALSE, &m_rightEyeDesc.m_depthStencilViewHandle);
