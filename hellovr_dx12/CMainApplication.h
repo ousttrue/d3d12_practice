@@ -1,10 +1,9 @@
 #pragma once
-#include <openvr.h>
-#include <vector>
 #include <wrl/client.h>
 #include <dxgi1_4.h>
-#include "d3dx12.h"
-#include "Matrices.h"
+#include <d3d12.h>
+#include <openvr.h>
+#include <string>
 
 class CMainApplication
 {
@@ -22,7 +21,6 @@ class CMainApplication
     class Pipeline *m_pipeline = nullptr;
     bool m_bShowCubes;
     std::string m_strPoseClasses;       // what classes we saw poses for this frame
-    static const int g_nFrameCount = 2; // Swapchain depth
     ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
     D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2] = {};
     UINT8 *m_pSceneConstantBufferData[2] = {};

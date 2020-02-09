@@ -16,19 +16,15 @@
 
 using Microsoft::WRL::ComPtr;
 
-//-----------------------------------------------------------------------------
-// Purpose: Constructor
-//-----------------------------------------------------------------------------
+static const int SWAPCHAIN_FRAME_COUNT = 2;
+
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iSceneVolumeInit)
     : m_pipeline(new Pipeline(msaa)),
-      m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(g_nFrameCount)),
+      m_sdl(new SDLApplication), m_hmd(new HMD), m_d3d(new DeviceRTV(SWAPCHAIN_FRAME_COUNT)),
       m_cbv(new CBV),
       m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow(msaa, flSuperSampleScale)),
       m_strPoseClasses(""), m_bShowCubes(true){};
 
-//-----------------------------------------------------------------------------
-// Purpose: Destructor
-//-----------------------------------------------------------------------------
 CMainApplication::~CMainApplication()
 {
     delete m_pipeline;
@@ -43,9 +39,6 @@ CMainApplication::~CMainApplication()
     dprintf("Shutdown");
 }
 
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
 static ComPtr<IDXGIFactory4> CreateFactory(bool isDebug)
 {
     UINT flag = 0;
