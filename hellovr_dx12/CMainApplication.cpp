@@ -109,42 +109,6 @@ bool CMainApplication::Initialize(bool bDebugD3D12)
 //-----------------------------------------------------------------------------
 bool CMainApplication::BInitD3D12()
 {
-    auto m_pDevice = m_d3d->Device();
-
-    // Create constant buffer
-    {
-        m_pDevice->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_pSceneConstantBuffer));
-
-        // Keep as persistently mapped buffer, store left eye in first 256 bytes, right eye in second
-        UINT8 *pBuffer;
-        CD3DX12_RANGE readRange(0, 0);
-        m_pSceneConstantBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pBuffer));
-        // Left eye to first 256 bytes, right eye to second 256 bytes
-        m_pSceneConstantBufferData[0] = pBuffer;
-        m_pSceneConstantBufferData[1] = pBuffer + 256;
-
-        // Left eye CBV
-        auto cbvLeftEyeHandle = m_cbv->CpuHandle(CBV_LEFT_EYE);
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {
-            .BufferLocation = m_pSceneConstantBuffer->GetGPUVirtualAddress(),
-            .SizeInBytes = (sizeof(Matrix4) + 255) & ~255, // Pad to 256 bytes
-        };
-        m_pDevice->CreateConstantBufferView(&cbvDesc, cbvLeftEyeHandle);
-        m_sceneConstantBufferView[0] = cbvLeftEyeHandle;
-
-        // Right eye CBV
-        auto cbvRightEyeHandle = m_cbv->CpuHandle(CBV_RIGHT_EYE);
-        cbvDesc.BufferLocation += 256;
-        m_pDevice->CreateConstantBufferView(&cbvDesc, cbvRightEyeHandle);
-        m_sceneConstantBufferView[1] = cbvRightEyeHandle;
-    }
-
     if (!m_pipeline->CreateAllShaders(m_d3d->Device()))
     {
         return false;
@@ -153,7 +117,7 @@ bool CMainApplication::BInitD3D12()
     // Create command list
     {
         ComPtr<ID3D12CommandAllocator> pAllocator;
-        if (FAILED(m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&pAllocator))))
+        if (FAILED(m_d3d->Device()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&pAllocator))))
         {
             return false;
         }
@@ -471,20 +435,11 @@ void CMainApplication::RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12Graphics
 {
     if (m_bShowCubes)
     {
+        // setup
         pCommandList->SetPipelineState(m_pipeline->SceneState().Get());
-
-        // Select the CBV (left or right eye)
-        auto cbvHandle = m_cbv->GpuHandle((CBVSRVIndex_t)nEye);
-        pCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
-
-        // SRV is just after the left eye
-        auto srvHandle = m_cbv->GpuHandle(SRV_TEXTURE_MAP);
-        pCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
-
-        // Update the persistently mapped pointer to the CB data with the latest matrix
-        memcpy(m_pSceneConstantBufferData[nEye], m_hmd->GetCurrentViewProjectionMatrix(nEye).get(), sizeof(Matrix4));
-
-        // Draw
+        // update constant buffer
+        m_cbv->Set(pCommandList, nEye, m_hmd->GetCurrentViewProjectionMatrix(nEye));
+        // draw
         m_cubes->Draw(pCommandList);
     }
 

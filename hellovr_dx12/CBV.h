@@ -31,6 +31,10 @@ class CBV
     UINT m_nCBVSRVDescriptorSize = 0;
     ComPtr<ID3D12DescriptorHeap> m_pCBVSRVHeap;
 
+    ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2] = {};
+    UINT8 *m_pSceneConstantBufferData[2] = {};
+
 public:
     const ComPtr<ID3D12DescriptorHeap> &Heap() const { return m_pCBVSRVHeap; }
     D3D12_CPU_DESCRIPTOR_HANDLE CpuHandle(CBVSRVIndex_t index) const
@@ -48,4 +52,5 @@ public:
 
     // Create descriptor heaps
     bool Initialize(const ComPtr<ID3D12Device> &device);
+    void Set(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, vr::EVREye nEye, const class Matrix4 &pose);
 };

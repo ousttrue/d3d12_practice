@@ -22,9 +22,6 @@ class CMainApplication
     std::unique_ptr<class Pipeline> m_pipeline;
     bool m_bShowCubes;
     std::string m_strPoseClasses; // what classes we saw poses for this frame
-    ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2] = {};
-    UINT8 *m_pSceneConstantBufferData[2] = {};
     ComPtr<ID3D12Resource> m_pTexture;
     ComPtr<ID3D12Resource> m_pTextureUploadHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_textureShaderResourceView;
