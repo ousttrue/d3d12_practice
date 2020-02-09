@@ -19,15 +19,10 @@ class CMainApplication
     class Axis *m_axis = nullptr;
     class CBV *m_cbv = nullptr;
     class CompanionWindow *m_companionWindow = nullptr;
-    int m_nMSAASampleCount;
+    class Pipeline *m_pipeline = nullptr;
     bool m_bShowCubes;
     std::string m_strPoseClasses;       // what classes we saw poses for this frame
     static const int g_nFrameCount = 2; // Swapchain depth
-    ComPtr<ID3D12RootSignature> m_pRootSignature;
-    ComPtr<ID3D12PipelineState> m_pScenePipelineState;
-    ComPtr<ID3D12PipelineState> m_pCompanionPipelineState;
-    ComPtr<ID3D12PipelineState> m_pAxesPipelineState;
-    ComPtr<ID3D12PipelineState> m_pRenderModelPipelineState;
     ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
     D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2] = {};
     UINT8 *m_pSceneConstantBufferData[2] = {};
@@ -49,7 +44,4 @@ private:
     void RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv);
     bool SetupTexturemaps(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void RenderScene(vr::Hmd_Eye nEye, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
-    bool CreateAllShaders();
-
-private:
 };

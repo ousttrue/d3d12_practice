@@ -9,6 +9,8 @@ add_executable(${TARGET_NAME}
     Models.cpp
     GenMipMapRGBA.cpp
     CompanionWindow.cpp
+    Pipeline.cpp
+    #
     dprintf.cpp
     main.cpp
     lodepng.cpp
