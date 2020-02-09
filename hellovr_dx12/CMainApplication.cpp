@@ -27,15 +27,6 @@ CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iScen
 
 CMainApplication::~CMainApplication()
 {
-    delete m_pipeline;
-    delete m_companionWindow;
-    delete m_axis;
-    delete m_models;
-    delete m_cubes;
-    delete m_cbv;
-    delete m_d3d;
-    delete m_hmd;
-    delete m_sdl;
     dprintf("Shutdown");
 }
 
@@ -196,7 +187,7 @@ bool CMainApplication::BInitD3D12()
                                                     m_cbv->CpuHandle(SRV_RIGHT_EYE),
                                                     m_d3d->DSVHandle(RTVIndex_t::RTV_RIGHT_EYE));
 
-            m_models->SetupRenderModels(m_hmd, m_d3d->Device(), m_cbv->Heap(), pCommandList);
+            m_models->SetupRenderModels(m_hmd.get(), m_d3d->Device(), m_cbv->Heap(), pCommandList);
         }
 
         // Do any work that was queued up during loading
@@ -272,7 +263,7 @@ void CMainApplication::ProcessVREvent(const vr::VREvent_t &event, const ComPtr<I
     {
     case vr::VREvent_TrackedDeviceActivated:
     {
-        m_models->SetupRenderModelForTrackedDevice(m_hmd, m_d3d->Device(), m_cbv->Heap(), pCommandList, event.trackedDeviceIndex);
+        m_models->SetupRenderModelForTrackedDevice(m_hmd.get(), m_d3d->Device(), m_cbv->Heap(), pCommandList, event.trackedDeviceIndex);
         dprintf("Device %u attached. Setting up render model.\n", event.trackedDeviceIndex);
     }
     break;
@@ -302,7 +293,7 @@ void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCom
         pCommandList->SetGraphicsRootSignature(m_pipeline->RootSignature().Get());
         pCommandList->SetDescriptorHeaps(1, m_cbv->Heap().GetAddressOf());
 
-        m_axis->UpdateControllerAxes(m_hmd, m_d3d->Device());
+        m_axis->UpdateControllerAxes(m_hmd.get(), m_d3d->Device());
 
         {
             // RENDER

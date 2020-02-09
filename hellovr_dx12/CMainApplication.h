@@ -4,23 +4,24 @@
 #include <d3d12.h>
 #include <openvr.h>
 #include <string>
+#include <memory>
 
 class CMainApplication
 {
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    class SDLApplication *m_sdl = nullptr;
-    class HMD *m_hmd = nullptr;
-    class DeviceRTV *m_d3d = nullptr;
-    class Cubes *m_cubes = nullptr;
-    class Models *m_models = nullptr;
-    class Axis *m_axis = nullptr;
-    class CBV *m_cbv = nullptr;
-    class CompanionWindow *m_companionWindow = nullptr;
-    class Pipeline *m_pipeline = nullptr;
+    std::unique_ptr<class SDLApplication> m_sdl;
+    std::unique_ptr<class HMD> m_hmd;
+    std::unique_ptr<class DeviceRTV> m_d3d;
+    std::unique_ptr<class Cubes> m_cubes;
+    std::unique_ptr<class Models> m_models;
+    std::unique_ptr<class Axis> m_axis;
+    std::unique_ptr<class CBV> m_cbv;
+    std::unique_ptr<class CompanionWindow> m_companionWindow;
+    std::unique_ptr<class Pipeline> m_pipeline;
     bool m_bShowCubes;
-    std::string m_strPoseClasses;       // what classes we saw poses for this frame
+    std::string m_strPoseClasses; // what classes we saw poses for this frame
     ComPtr<ID3D12Resource> m_pSceneConstantBuffer;
     D3D12_CPU_DESCRIPTOR_HANDLE m_sceneConstantBufferView[2] = {};
     UINT8 *m_pSceneConstantBufferData[2] = {};
