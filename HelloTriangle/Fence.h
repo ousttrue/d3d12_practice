@@ -1,16 +1,19 @@
 #pragma once
 #include <d3d12.h>
 #include <wrl/client.h>
-#include <DirectXMath.h>
 
-class Scene
+class Fence
 {
     template<class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    ComPtr<ID3D12Resource> m_vertexBuffer;
+    HANDLE m_fenceEvent = NULL;
+    ComPtr<ID3D12Fence> m_fence;
+    UINT64 m_fenceValue = 1;
 
 public:
+    Fence();
+    ~Fence();
     void Initialize(const ComPtr<ID3D12Device> &device);
-    void Draw(const ComPtr<ID3D12GraphicsCommandList> &commandList);
+    void Wait(const ComPtr<ID3D12CommandQueue> queue);
 };
