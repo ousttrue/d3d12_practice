@@ -1,6 +1,7 @@
 #include "D3D12HelloTriangle.h"
 #include <Windows.h>
 #include <string>
+#include <thread>
 
 const auto FRAME_COUNT = 2;
 
@@ -24,18 +25,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
         EndPaint(hWnd, &ps);
-        if (pSample)
-        {
-            pSample->Render(hWnd);
-        }
+        // if (pSample)
+        // {
+        //     pSample->Render(hWnd);
+        // }
         return 0;
     }
 
-    case WM_SIZE:
-    {
-        pSample->SetSize(LOWORD(lParam), HIWORD(lParam));
-        return 0;
-    }
+    // case WM_SIZE:
+    // {
+    //     pSample->SetSwapchainSize(LOWORD(lParam), HIWORD(lParam));
+    //     return 0;
+    // }
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -75,6 +76,16 @@ struct CommandLine
     }
 };
 
+bool volatile g_running = true;
+
+static void RenderThread(D3D12HelloTriangle *renderer)
+{
+    while (g_running)
+    {
+        renderer->Render();
+    }
+}
+
 _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
     CommandLine cmd;
@@ -109,11 +120,16 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
         hInstance,
         &sample);
 
-    RECT rect;
-    GetClientRect(hWnd, &rect);
-    sample.SetSize(rect.right - rect.left, rect.bottom - rect.top);
+
+    if(!sample.Initialize(hWnd))
+    {
+        return false;
+    }
 
     ShowWindow(hWnd, nCmdShow);
+
+    // launch render thread
+    std::thread t(RenderThread, &sample);
 
     // Main sample loop.
     MSG msg;
@@ -129,6 +145,9 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
             DispatchMessage(&msg);
         }
     }
+
+    g_running = false;
+    t.join();
 
     return static_cast<int>(msg.wParam);
 }

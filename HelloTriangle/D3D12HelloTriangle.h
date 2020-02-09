@@ -7,6 +7,7 @@ class D3D12HelloTriangle
 public:
     D3D12HelloTriangle(bool useWarpDevice, unsigned int frameCount);
     ~D3D12HelloTriangle();
-    void Render(void* hWnd);
-    void SetSize(int w, int h);
+    void Render();
+    // void SetSwapchainSize(int w, int h);
+    bool Initialize(void *hWnd);
 };

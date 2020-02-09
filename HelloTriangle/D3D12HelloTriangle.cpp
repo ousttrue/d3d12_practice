@@ -9,7 +9,7 @@
 #include "Fence.h"
 #include "Swapchain.h"
 
-template<class T>
+template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 static Microsoft::WRL::ComPtr<IDXGIFactory4> CreateFactory()
@@ -62,7 +62,9 @@ static Microsoft::WRL::ComPtr<IDXGIAdapter1> GetHardwareAdapter(const Microsoft:
     }
 
     return nullptr;
-}class Impl
+}
+
+class Impl
 {
     bool m_useWarpDevice = false;
 
@@ -87,28 +89,34 @@ public:
         m_fence.Wait(m_commandQueue);
     }
 
-    void SetSize(int w, int h)
+    bool Initialize(HWND hWnd)
+    {
+        RECT rect;
+        GetClientRect(hWnd, &rect);
+        SetSwapchainSize(rect.right - rect.left, rect.bottom - rect.top);
+
+        auto factory = CreateFactory();
+        // create deice and device queue
+        Initialize(factory);
+        // create swapchain and rendertargets
+        m_swapchain.Initialize(factory, m_commandQueue, hWnd, m_width, m_height);
+        m_swapchain.CreateRenderTargets(m_device);
+        // pipeline
+        m_builder.Initialize(m_device);
+        // Create synchronization objects and wait until assets have been uploaded to the GPU.
+        m_fence.Initialize(m_device);
+
+        return true;
+    }
+
+    void SetSwapchainSize(int w, int h)
     {
         // TODO: update swapchain
         m_builder.SetSize(w, h);
     }
 
-    void Render(HWND hWnd)
+    void Render()
     {
-        if (!m_device)
-        {
-            auto factory = CreateFactory();
-            // create deice and device queue
-            Initialize(factory);
-            // create swapchain and rendertargets
-            m_swapchain.Initialize(factory, m_commandQueue, hWnd, m_width, m_height);
-            m_swapchain.CreateRenderTargets(m_device);
-            // pipeline
-            m_builder.Initialize(m_device);
-            // Create synchronization objects and wait until assets have been uploaded to the GPU.
-            m_fence.Initialize(m_device);
-        }
-
         // Record all the commands we need to render the scene into the command list.
         auto commandList = m_builder.PopulateCommandList(
             m_swapchain.CurrentRTV(), m_swapchain.CurrentHandle());
@@ -165,12 +173,17 @@ D3D12HelloTriangle::~D3D12HelloTriangle()
     delete m_impl;
 }
 
-void D3D12HelloTriangle::Render(void *hWnd)
+void D3D12HelloTriangle::Render()
 {
-    m_impl->Render((HWND)hWnd);
+    m_impl->Render();
 }
 
-void D3D12HelloTriangle::SetSize(int w, int h)
+// void D3D12HelloTriangle::SetSwapchainSize(int w, int h)
+// {
+//     m_impl->SetSwapchainSize(w, h);
+// }
+
+bool D3D12HelloTriangle::Initialize(void *hWnd)
 {
-    m_impl->SetSize(w, h);
+    return m_impl->Initialize((HWND)hWnd);
 }

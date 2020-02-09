@@ -15,6 +15,7 @@ void Swapchain::Initialize(const ComPtr<IDXGIFactory4> &factory,
         .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
         .BufferCount = m_frameCount,
         .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+        // .Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT,
     };
 
     ComPtr<IDXGISwapChain1> swapChain;
@@ -31,6 +32,8 @@ void Swapchain::Initialize(const ComPtr<IDXGIFactory4> &factory,
 
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+    // m_swapChain->SetMaximumFrameLatency(1);
 }
 
 void Swapchain::CreateRenderTargets(const ComPtr<ID3D12Device> &device)
