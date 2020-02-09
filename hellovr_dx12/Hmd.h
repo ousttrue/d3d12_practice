@@ -6,6 +6,7 @@
 
 class HMD
 {
+    std::string m_strPoseClasses;
     vr::IVRSystem *m_pHMD = nullptr;
 
     Matrix4 m_mat4HMDPose;
@@ -37,7 +38,7 @@ public:
     Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
     Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
     Matrix4 GetCurrentViewProjectionMatrix(vr::Hmd_Eye nEye);
-    int UpdateHMDMatrixPose(std::string &m_strPoseClasses);
+    int UpdateHMDMatrixPose();
     bool PoseIsValid(uint32_t unTrackedDevice);
     bool IsVisible(uint32_t unTrackedDevice) const
     {

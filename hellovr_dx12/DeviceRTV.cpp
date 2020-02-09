@@ -3,11 +3,6 @@
 template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-DeviceRTV::DeviceRTV(int frameCount)
-	: m_frames(frameCount)
-{
-}
-
 ComPtr<ID3D12Device> DeviceRTV::CreateDevice(const ComPtr<IDXGIFactory4> &factory, int adapterIndex)
 {
 	ComPtr<IDXGIAdapter1> adapter;
@@ -60,7 +55,7 @@ bool DeviceRTV::CreateSwapchain(const ComPtr<IDXGIFactory4> &pFactory, int width
 {
 	// Create the swapchain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-	swapChainDesc.BufferCount = (UINT)m_frames.size();
+	swapChainDesc.BufferCount = (UINT)_countof(m_frames);
 	swapChainDesc.Width = width;
 	swapChainDesc.Height = height;
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -105,7 +100,7 @@ void DeviceRTV::Present()
 
 void DeviceRTV::SetupFrameResources(const ComPtr<ID3D12PipelineState> &pipelineState)
 {
-	for (int nFrame = 0; nFrame < m_frames.size(); nFrame++)
+	for (int nFrame = 0; nFrame < SWAPCHAIN_FRAME_COUNT; nFrame++)
 	{
 		// Create per-frame resources
 		auto &frame = m_frames[nFrame];

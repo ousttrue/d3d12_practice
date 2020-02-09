@@ -3,7 +3,6 @@
 #include <dxgi1_4.h>
 #include <d3d12.h>
 #include <openvr.h>
-#include <string>
 #include <memory>
 
 class CMainApplication
@@ -22,7 +21,6 @@ class CMainApplication
     std::unique_ptr<class Pipeline> m_pipeline;
     std::unique_ptr<class Texture> m_texture;
     bool m_bShowCubes = false;
-    std::string m_strPoseClasses; // what classes we saw poses for this frame
 
 public:
     CMainApplication(int msaa, float flSuperSampleScale, int volume);
@@ -31,8 +29,6 @@ public:
     void RunMainLoop();
 
 private:
-    bool BInitD3D12();
-    bool BInitCompositor();
     bool HandleInput(const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void ProcessVREvent(const vr::VREvent_t &event, const ComPtr<ID3D12GraphicsCommandList> &pCommandList);
     void RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCommandList, const ComPtr<ID3D12Resource> &rtv);

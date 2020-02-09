@@ -15,15 +15,16 @@
 
 using Microsoft::WRL::ComPtr;
 
-static const int SWAPCHAIN_FRAME_COUNT = 2;
 
 CMainApplication::CMainApplication(int msaa, float flSuperSampleScale, int iSceneVolumeInit)
     : m_pipeline(new Pipeline(msaa)), m_texture(new Texture),
       m_sdl(new SDLApplication),
-      m_hmd(new HMD), m_d3d(new DeviceRTV(SWAPCHAIN_FRAME_COUNT)),
+      m_hmd(new HMD), m_d3d(new DeviceRTV),
       m_cbv(new CBV),
       m_models(new Models), m_axis(new Axis), m_cubes(new Cubes(iSceneVolumeInit)), m_companionWindow(new CompanionWindow(msaa, flSuperSampleScale)),
-      m_strPoseClasses(""), m_bShowCubes(true){};
+      m_bShowCubes(true)
+{
+}
 
 CMainApplication::~CMainApplication()
 {
@@ -63,6 +64,12 @@ bool CMainApplication::Initialize(bool bDebugD3D12)
         return false;
     }
 
+    //-----------------------------------------------------------------------------
+    // Purpose: Initialize DX12. Returns true if DX12 has been successfully
+    //          initialized, false if shaders could not be created.
+    //          If failure occurred in a module other than shaders, the function
+    //          may return true or throw an error.
+    //-----------------------------------------------------------------------------
     auto factory = CreateFactory(bDebugD3D12);
     if (!factory)
     {
@@ -86,29 +93,6 @@ bool CMainApplication::Initialize(bool bDebugD3D12)
         return false;
     }
 
-    if (!BInitD3D12())
-    {
-        dprintf("%s - Unable to initialize D3D12!\n", __FUNCTION__);
-        return false;
-    }
-
-    if (!BInitCompositor())
-    {
-        dprintf("%s - Failed to initialize VR Compositor!\n", __FUNCTION__);
-        return false;
-    }
-
-    return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Initialize DX12. Returns true if DX12 has been successfully
-//          initialized, false if shaders could not be created.
-//          If failure occurred in a module other than shaders, the function
-//          may return true or throw an error.
-//-----------------------------------------------------------------------------
-bool CMainApplication::BInitD3D12()
-{
     if (!m_pipeline->CreateAllShaders(m_d3d->Device()))
     {
         return false;
@@ -161,21 +145,17 @@ bool CMainApplication::BInitD3D12()
         m_d3d->Sync();
     }
 
-    return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Initialize Compositor. Returns true if the compositor was
-//          successfully initialized, false otherwise.
-//-----------------------------------------------------------------------------
-bool CMainApplication::BInitCompositor()
-{
-    vr::EVRInitError peError = vr::VRInitError_None;
-
-    if (!vr::VRCompositor())
     {
-        dprintf("Compositor initialization failed. See log file for details\n");
-        return false;
+        //-----------------------------------------------------------------------------
+        // Purpose: Initialize Compositor. Returns true if the compositor was
+        //          successfully initialized, false otherwise.
+        //-----------------------------------------------------------------------------
+        vr::EVRInitError peError = vr::VRInitError_None;
+        if (!vr::VRCompositor())
+        {
+            dprintf("Compositor initialization failed. See log file for details\n");
+            return false;
+        }
     }
 
     return true;
@@ -335,7 +315,7 @@ void CMainApplication::RenderFrame(const ComPtr<ID3D12GraphicsCommandList> &pCom
     // Wait for completion
     m_d3d->Sync();
 
-    auto m_iValidPoseCount = m_hmd->UpdateHMDMatrixPose(m_strPoseClasses);
+    auto m_iValidPoseCount = m_hmd->UpdateHMDMatrixPose();
 }
 
 //-----------------------------------------------------------------------------

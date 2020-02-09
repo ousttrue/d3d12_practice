@@ -142,7 +142,7 @@ Matrix4 HMD::GetCurrentViewProjectionMatrix(vr::Hmd_Eye nEye)
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-int HMD::UpdateHMDMatrixPose(std::string &m_strPoseClasses)
+int HMD::UpdateHMDMatrixPose()
 {
     if (!m_pHMD)
         return 0;

@@ -23,6 +23,8 @@ class DeviceRTV
 	template <class T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+	static const int SWAPCHAIN_FRAME_COUNT = 2;
+
 	// d3d12
 	ComPtr<ID3D12Device> m_pDevice;
 	ComPtr<ID3D12CommandQueue> m_pCommandQueue;
@@ -47,14 +49,12 @@ class DeviceRTV
 		ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
 		UINT64 m_nFenceValues = 0;
 	};
-	std::vector<FrameResource> m_frames;
+	FrameResource m_frames[SWAPCHAIN_FRAME_COUNT] = {};
 
 public:
-	DeviceRTV(int frameCount);
 	const ComPtr<ID3D12Device> &Device() const { return m_pDevice; }
 	const ComPtr<ID3D12CommandQueue> &Queue() const { return m_pCommandQueue; }
 	const ComPtr<IDXGISwapChain3> &Swapchain() const { return m_pSwapChain; }
-	// UINT FrameIndex() const { return m_nFrameIndex; }
 
 	D3D12_CPU_DESCRIPTOR_HANDLE RTVHandle(RTVIndex_t index) const
 	{
