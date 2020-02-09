@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include "d3dx12.h"
 #include <wrl/client.h>
+#include <openvr.h>
 
 // Slots in the ConstantBufferView/ShaderResourceView descriptor heap
 enum CBVSRVIndex_t
@@ -31,10 +32,7 @@ class CBV
     ComPtr<ID3D12DescriptorHeap> m_pCBVSRVHeap;
 
 public:
-    const ComPtr<ID3D12DescriptorHeap> &Heap() const
-    {
-        return m_pCBVSRVHeap;
-    }
+    const ComPtr<ID3D12DescriptorHeap> &Heap() const { return m_pCBVSRVHeap; }
     D3D12_CPU_DESCRIPTOR_HANDLE CpuHandle(CBVSRVIndex_t index) const
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_pCBVSRVHeap->GetCPUDescriptorHandleForHeapStart());
@@ -49,16 +47,5 @@ public:
     }
 
     // Create descriptor heaps
-    bool Initialize(const ComPtr<ID3D12Device> &device)
-    {
-        m_nCBVSRVDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-        D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {};
-        cbvSrvHeapDesc.NumDescriptors = NUM_SRV_CBVS;
-        cbvSrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        cbvSrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        device->CreateDescriptorHeap(&cbvSrvHeapDesc, IID_PPV_ARGS(&m_pCBVSRVHeap));
-
-        return true;
-    }
+    bool Initialize(const ComPtr<ID3D12Device> &device);
 };

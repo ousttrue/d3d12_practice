@@ -10,6 +10,7 @@ add_executable(${TARGET_NAME}
     GenMipMapRGBA.cpp
     CompanionWindow.cpp
     Pipeline.cpp
+    CBV.cpp
     #
     dprintf.cpp
     main.cpp
