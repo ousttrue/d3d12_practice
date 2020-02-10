@@ -29,7 +29,7 @@ private:
     ComPtr<ID3D12Fence> g_fence;
     HANDLE g_fenceEvent = NULL;
     UINT64 g_fenceLastSignaledValue = 0;
-    IDXGISwapChain3 *g_pSwapChain = NULL;
+    ComPtr<IDXGISwapChain3> g_pSwapChain;
     HANDLE g_hSwapChainWaitableObject = NULL;
     D3D12_RESOURCE_BARRIER barrier = {};
 
@@ -41,11 +41,7 @@ public:
     ~Impl()
     {
         CleanupRenderTarget();
-        if (g_pSwapChain)
-        {
-            g_pSwapChain->Release();
-            g_pSwapChain = NULL;
-        }
+
         if (g_hSwapChainWaitableObject != NULL)
         {
             CloseHandle(g_hSwapChainWaitableObject);
@@ -55,8 +51,6 @@ public:
             {
                 g_frameContext[i].CommandAllocator.Reset();
             }
-
-
 
         if (g_fenceEvent)
         {
@@ -261,7 +255,10 @@ public:
         ComPtr<IDXGIFactory4> dxgiFactory;
         g_pSwapChain->GetParent(IID_PPV_ARGS(&dxgiFactory));
 
-        g_pSwapChain->Release();
+        ////////////////////
+        // release !
+        ////////////////////
+        g_pSwapChain.Reset();
         CloseHandle(g_hSwapChainWaitableObject);
 
         ComPtr<IDXGISwapChain1> swapChain1;
