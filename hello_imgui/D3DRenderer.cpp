@@ -2,29 +2,6 @@
 //#define DX12_ENABLE_DEBUG_LAYER
 #include <assert.h>
 
-#ifdef DX12_ENABLE_DEBUG_LAYER
-#include <dxgidebug.h>
-#pragma comment(lib, "dxguid.lib")
-#endif
-
-static void EnableDebugLayer()
-{
-    ComPtr<ID3D12Debug> pdx12Debug;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pdx12Debug))))
-    {
-        pdx12Debug->EnableDebugLayer();
-    }
-}
-
-static void ReportLiveObjects()
-{
-    ComPtr<IDXGIDebug1> pDebug;
-    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
-    {
-        pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
-    }
-}
-
 struct FrameContext
 {
     ComPtr<ID3D12CommandAllocator> CommandAllocator;
@@ -91,9 +68,6 @@ public:
             g_fenceEvent = NULL;
         }
 
-#ifdef DX12_ENABLE_DEBUG_LAYER
-        ReportLiveObjects();
-#endif
     }
     ID3D12Device *Device()
     {
@@ -113,9 +87,6 @@ public:
 
     bool CreateDeviceD3D(HWND hWnd)
     {
-#ifdef DX12_ENABLE_DEBUG_LAYER
-        EnableDebugLayer();
-#endif
 
         if (FAILED(D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&g_pd3dDevice))))
         {
@@ -188,29 +159,36 @@ public:
 
         {
             // Setup swap chain
-            DXGI_SWAP_CHAIN_DESC1 sd;
-            {
-                ZeroMemory(&sd, sizeof(sd));
-                sd.BufferCount = (UINT)g_frameContext.size();
-                sd.Width = 0;
-                sd.Height = 0;
-                sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-                sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
-                sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-                sd.SampleDesc.Count = 1;
-                sd.SampleDesc.Quality = 0;
-                sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-                sd.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-                sd.Scaling = DXGI_SCALING_STRETCH;
-                sd.Stereo = FALSE;
-            }
-
+            DXGI_SWAP_CHAIN_DESC1 sd{
+                .Width = 0,
+                .Height = 0,
+                .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+                .Stereo = FALSE,
+                .SampleDesc = {
+                    .Count = 1,
+                    .Quality = 0,
+                },
+                .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                .BufferCount = (UINT)g_frameContext.size(),
+                .Scaling = DXGI_SCALING_STRETCH,
+                .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+                .AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED,
+                .Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT,
+            };
             ComPtr<IDXGIFactory4> dxgiFactory;
-            ComPtr<IDXGISwapChain1> swapChain1;
-            if (CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)) != S_OK ||
-                dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue.Get(), hWnd, &sd, NULL, NULL, &swapChain1) != S_OK ||
-                swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK)
+            if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory))))
+            {
                 return false;
+            }
+            ComPtr<IDXGISwapChain1> swapChain1;
+            if (FAILED(dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue.Get(), hWnd, &sd, NULL, NULL, &swapChain1)))
+            {
+                return false;
+            }
+            if (FAILED(swapChain1.As(&g_pSwapChain)))
+            {
+                return false;
+            }
             g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
             g_hSwapChainWaitableObject = g_pSwapChain->GetFrameLatencyWaitableObject();
         }

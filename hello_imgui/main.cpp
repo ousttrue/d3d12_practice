@@ -8,7 +8,30 @@
 #include "imgui_impl_dx12.h"
 #include <tchar.h>
 
+#ifdef DX12_ENABLE_DEBUG_LAYER
+#include <dxgidebug.h>
+#pragma comment(lib, "dxguid.lib")
+#endif
+
 static int const NUM_BACK_BUFFERS = 3;
+
+static void EnableDebugLayer()
+{
+    ComPtr<ID3D12Debug> pdx12Debug;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pdx12Debug))))
+    {
+        pdx12Debug->EnableDebugLayer();
+    }
+}
+
+static void ReportLiveObjects()
+{
+    ComPtr<IDXGIDebug1> pDebug;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+    {
+        pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
+    }
+}
 
 struct Gwlp
 {
@@ -63,8 +86,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return ::DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// Main code
-int main(int, char **)
+int run()
 {
     D3DRenderer renderer(NUM_BACK_BUFFERS);
 
@@ -200,4 +222,16 @@ int main(int, char **)
     ::UnregisterClass(wc.lpszClassName, wc.hInstance);
 
     return 0;
+}
+
+int main(int, char **)
+{
+#ifdef DX12_ENABLE_DEBUG_LAYER
+    EnableDebugLayer();
+#endif
+    auto ret = run();
+#ifdef DX12_ENABLE_DEBUG_LAYER
+    ReportLiveObjects();
+#endif
+    return ret;
 }
