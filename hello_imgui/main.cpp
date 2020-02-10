@@ -2,12 +2,12 @@
 // If you are new to dear imgui, see examples/README.txt and documentation at the top of imgui.cpp.
 // FIXME: 64-bit only for now! (Because sizeof(ImTextureId) == sizeof(void*))
 
+#include "D3DRenderer.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 #include <tchar.h>
 
-#include "D3DManager.h"
 
 struct Gwlp
 {
@@ -29,7 +29,7 @@ struct Gwlp
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    auto d3d = Gwlp::Get<D3D>(hWnd);
+    auto renderer = Gwlp::Get<D3DRenderer>(hWnd);
 
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
@@ -44,7 +44,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         if (wParam != SIZE_MINIMIZED)
         {
             ImGui_ImplDX12_InvalidateDeviceObjects();
-            d3d->OnSize(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
+            renderer->OnSize(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
             ImGui_ImplDX12_CreateDeviceObjects();
         }
         return 0;
@@ -65,17 +65,17 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 // Main code
 int main(int, char **)
 {
-    D3D d3d;
+    D3DRenderer renderer;
 
     // Create application window
     WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("ImGui Example"), NULL};
     ::RegisterClassEx(&wc);
-    HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("Dear ImGui DirectX12 Example"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, &d3d);
+    HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("Dear ImGui DirectX12 Example"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, &renderer);
 
     // Initialize Direct3D
-    if (!d3d.CreateDeviceD3D(hwnd))
+    if (!renderer.CreateDeviceD3D(hwnd))
     {
-        d3d.CleanupDeviceD3D();
+        renderer.CleanupDeviceD3D();
         ::UnregisterClass(wc.lpszClassName, wc.hInstance);
         return 1;
     }
@@ -98,10 +98,10 @@ int main(int, char **)
 
     // Setup Platform/Renderer bindings
     ImGui_ImplWin32_Init(hwnd);
-    ImGui_ImplDX12_Init(d3d.Device(), D3D::NUM_FRAMES_IN_FLIGHT,
-                        DXGI_FORMAT_R8G8B8A8_UNORM, d3d.SrvHeap(),
-                        d3d.SrvHeap()->GetCPUDescriptorHandleForHeapStart(),
-                        d3d.SrvHeap()->GetGPUDescriptorHandleForHeapStart());
+    ImGui_ImplDX12_Init(renderer.Device(), D3DRenderer::NUM_FRAMES_IN_FLIGHT,
+                        DXGI_FORMAT_R8G8B8A8_UNORM, renderer.SrvHeap(),
+                        renderer.SrvHeap()->GetCPUDescriptorHandleForHeapStart(),
+                        renderer.SrvHeap()->GetGPUDescriptorHandleForHeapStart());
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -183,18 +183,18 @@ int main(int, char **)
         }
 
         // Rendering
-        auto frameCtxt = d3d.Begin(&clear_color.x);
+        auto frameCtxt = renderer.Begin(&clear_color.x);
         ImGui::Render();
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), d3d.CommandList());
-        d3d.End(frameCtxt);
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), renderer.CommandList());
+        renderer.End(frameCtxt);
     }
 
-    d3d.WaitForLastSubmittedFrame();
+    renderer.WaitForLastSubmittedFrame();
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    d3d.CleanupDeviceD3D();
+    renderer.CleanupDeviceD3D();
     ::DestroyWindow(hwnd);
     ::UnregisterClass(wc.lpszClassName, wc.hInstance);
 

@@ -1,4 +1,4 @@
-#include "D3DManager.h"
+#include "D3DRenderer.h"
 //#define DX12_ENABLE_DEBUG_LAYER
 #include <assert.h>
 
@@ -8,7 +8,7 @@
 #endif
 
 
-void D3D::OnSize(HWND hWnd, UINT w, UINT h)
+void D3DRenderer::OnSize(HWND hWnd, UINT w, UINT h)
 {
     if (g_pd3dDevice)
     {
@@ -18,7 +18,7 @@ void D3D::OnSize(HWND hWnd, UINT w, UINT h)
     }
 }
 
-bool D3D::CreateDeviceD3D(HWND hWnd)
+bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
 {
     // Setup swap chain
     DXGI_SWAP_CHAIN_DESC1 sd;
@@ -119,7 +119,7 @@ bool D3D::CreateDeviceD3D(HWND hWnd)
     return true;
 }
 
-void D3D::CreateRenderTarget()
+void D3DRenderer::CreateRenderTarget()
 {
     for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
     {
@@ -130,7 +130,7 @@ void D3D::CreateRenderTarget()
     }
 }
 
-void D3D::WaitForLastSubmittedFrame()
+void D3DRenderer::WaitForLastSubmittedFrame()
 {
     FrameContext *frameCtxt = &g_frameContext[g_frameIndex % NUM_FRAMES_IN_FLIGHT];
 
@@ -146,7 +146,7 @@ void D3D::WaitForLastSubmittedFrame()
     WaitForSingleObject(g_fenceEvent, INFINITE);
 }
 
-void D3D::CleanupRenderTarget()
+void D3DRenderer::CleanupRenderTarget()
 {
     WaitForLastSubmittedFrame();
 
@@ -158,7 +158,7 @@ void D3D::CleanupRenderTarget()
         }
 }
 
-void D3D::CleanupDeviceD3D()
+void D3DRenderer::CleanupDeviceD3D()
 {
     CleanupRenderTarget();
     if (g_pSwapChain)
@@ -222,7 +222,7 @@ void D3D::CleanupDeviceD3D()
 #endif
 }
 
-FrameContext *D3D::WaitForNextFrameResources()
+FrameContext *D3DRenderer::WaitForNextFrameResources()
 {
     UINT nextFrameIndex = g_frameIndex + 1;
     g_frameIndex = nextFrameIndex;
@@ -245,7 +245,7 @@ FrameContext *D3D::WaitForNextFrameResources()
     return frameCtxt;
 }
 
-void D3D::ResizeSwapChain(HWND hWnd, int width, int height)
+void D3DRenderer::ResizeSwapChain(HWND hWnd, int width, int height)
 {
     DXGI_SWAP_CHAIN_DESC1 sd;
     g_pSwapChain->GetDesc1(&sd);
@@ -270,7 +270,7 @@ void D3D::ResizeSwapChain(HWND hWnd, int width, int height)
     assert(g_hSwapChainWaitableObject != NULL);
 }
 
-FrameContext *D3D::Begin(const float *clear_color)
+FrameContext *D3DRenderer::Begin(const float *clear_color)
 {
     auto frameCtxt = WaitForNextFrameResources();
     UINT backBufferIdx = g_pSwapChain->GetCurrentBackBufferIndex();
@@ -292,7 +292,7 @@ FrameContext *D3D::Begin(const float *clear_color)
     return frameCtxt;
 }
 
-void D3D::End(FrameContext *frameCtxt)
+void D3DRenderer::End(FrameContext *frameCtxt)
 {
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;

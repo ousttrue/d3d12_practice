@@ -8,7 +8,7 @@ struct FrameContext
     ID3D12CommandAllocator *CommandAllocator;
     UINT64 FenceValue;
 };
-class D3D
+class D3DRenderer
 {
 public:
     static int const NUM_BACK_BUFFERS = 3;
