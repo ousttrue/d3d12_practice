@@ -1,6 +1,7 @@
 set(TARGET_NAME hello_imgui)
 add_executable(${TARGET_NAME}
     main.cpp
+    D3DManager.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
