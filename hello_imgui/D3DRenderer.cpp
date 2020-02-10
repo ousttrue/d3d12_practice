@@ -7,7 +7,7 @@ struct FrameContext
     ComPtr<ID3D12CommandAllocator> CommandAllocator;
     UINT64 FenceValue = 0;
     ComPtr<ID3D12Resource> g_mainRenderTargetResource;
-    D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor = {};
+    D3D12_CPU_DESCRIPTOR_HANDLE g_rtvHandle = {};
 
     bool Initialize(const ComPtr<ID3D12Device> &device, const ComPtr<ID3D12DescriptorHeap> &rtvHeap, int i)
     {
@@ -19,7 +19,7 @@ struct FrameContext
         auto rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         auto rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
         rtvHandle.ptr += i * rtvDescriptorSize;
-        g_mainRenderTargetDescriptor = rtvHandle;
+        g_rtvHandle = rtvHandle;
 
         return true;
     }
@@ -50,24 +50,17 @@ public:
     }
     ~Impl()
     {
-        CleanupRenderTarget();
-
+        WaitForLastSubmittedFrame();
         if (g_hSwapChainWaitableObject != NULL)
         {
             CloseHandle(g_hSwapChainWaitableObject);
+            g_hSwapChainWaitableObject = NULL;
         }
-        for (UINT i = 0; i < g_frameContext.size(); i++)
-            if (g_frameContext[i].CommandAllocator)
-            {
-                g_frameContext[i].CommandAllocator.Reset();
-            }
-
         if (g_fenceEvent)
         {
             CloseHandle(g_fenceEvent);
             g_fenceEvent = NULL;
         }
-
     }
     ID3D12Device *Device()
     {
@@ -203,7 +196,7 @@ public:
         {
             ComPtr<ID3D12Resource> pBackBuffer;
             g_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-            g_pd3dDevice->CreateRenderTargetView(pBackBuffer.Get(), NULL, g_frameContext[i].g_mainRenderTargetDescriptor);
+            g_pd3dDevice->CreateRenderTargetView(pBackBuffer.Get(), NULL, g_frameContext[i].g_rtvHandle);
             g_frameContext[i].g_mainRenderTargetResource = pBackBuffer;
         }
     }
@@ -229,10 +222,12 @@ public:
         WaitForLastSubmittedFrame();
 
         for (UINT i = 0; i < g_frameContext.size(); i++)
+        {
             if (g_frameContext[i].g_mainRenderTargetResource)
             {
                 g_frameContext[i].g_mainRenderTargetResource.Reset();
             }
+        }
     }
 
     FrameContext *WaitForNextFrameResources()
@@ -289,18 +284,19 @@ public:
         auto frameCtxt = WaitForNextFrameResources();
         UINT backBufferIdx = g_pSwapChain->GetCurrentBackBufferIndex();
         frameCtxt->CommandAllocator->Reset();
+        g_pd3dCommandList->Reset(frameCtxt->CommandAllocator.Get(), NULL);
 
+        // barrier
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         barrier.Transition.pResource = g_frameContext[backBufferIdx].g_mainRenderTargetResource.Get();
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-        g_pd3dCommandList->Reset(frameCtxt->CommandAllocator.Get(), NULL);
         g_pd3dCommandList->ResourceBarrier(1, &barrier);
-        g_pd3dCommandList->ClearRenderTargetView(g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, clear_color, 0, NULL);
-        g_pd3dCommandList->OMSetRenderTargets(1, &g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, FALSE, NULL);
+
+        g_pd3dCommandList->ClearRenderTargetView(g_frameContext[backBufferIdx].g_rtvHandle, clear_color, 0, NULL);
+        g_pd3dCommandList->OMSetRenderTargets(1, &g_frameContext[backBufferIdx].g_rtvHandle, FALSE, NULL);
         g_pd3dCommandList->SetDescriptorHeaps(1, g_pd3dSrvDescHeap.GetAddressOf());
 
         return frameCtxt;
@@ -308,16 +304,18 @@ public:
 
     void End(FrameContext *frameCtxt)
     {
+        // barrier
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
         g_pd3dCommandList->ResourceBarrier(1, &barrier);
-        g_pd3dCommandList->Close();
 
+        // execute
+        g_pd3dCommandList->Close();
         g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList *const *)g_pd3dCommandList.GetAddressOf());
 
+        // present sync
         g_pSwapChain->Present(1, 0); // Present with vsync
         //g_pSwapChain->Present(0, 0); // Present without vsync
-
         UINT64 fenceValue = g_fenceLastSignaledValue + 1;
         g_pd3dCommandQueue->Signal(g_fence.Get(), fenceValue);
         g_fenceLastSignaledValue = fenceValue;
