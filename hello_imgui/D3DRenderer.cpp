@@ -40,8 +40,71 @@ public:
     }
     ~Impl()
     {
+        CleanupRenderTarget();
+        if (g_pSwapChain)
+        {
+            g_pSwapChain->Release();
+            g_pSwapChain = NULL;
+        }
+        if (g_hSwapChainWaitableObject != NULL)
+        {
+            CloseHandle(g_hSwapChainWaitableObject);
+        }
+        for (UINT i = 0; i < g_frameContext.size(); i++)
+            if (g_frameContext[i].CommandAllocator)
+            {
+                g_frameContext[i].CommandAllocator.Reset();
+            }
+        if (g_pd3dCommandQueue)
+        {
+            g_pd3dCommandQueue->Release();
+            g_pd3dCommandQueue = NULL;
+        }
+        if (g_pd3dCommandList)
+        {
+            g_pd3dCommandList->Release();
+            g_pd3dCommandList = NULL;
+        }
+        if (g_pd3dRtvDescHeap)
+        {
+            g_pd3dRtvDescHeap->Release();
+            g_pd3dRtvDescHeap = NULL;
+        }
+        if (g_pd3dSrvDescHeap)
+        {
+            g_pd3dSrvDescHeap->Release();
+            g_pd3dSrvDescHeap = NULL;
+        }
+        if (g_fence)
+        {
+            g_fence->Release();
+            g_fence = NULL;
+        }
+        if (g_fenceEvent)
+        {
+            CloseHandle(g_fenceEvent);
+            g_fenceEvent = NULL;
+        }
+        if (g_pd3dDevice)
+        {
+            g_pd3dDevice->Release();
+            g_pd3dDevice = NULL;
+        }
+
+#ifdef DX12_ENABLE_DEBUG_LAYER
+        {
+            ComPtr<IDXGIDebug1> pDebug;
+            if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+            {
+                pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
+            }
+        }
+#endif
     }
-    ID3D12Device *Device() { return g_pd3dDevice; }
+    ID3D12Device *Device()
+    {
+        return g_pd3dDevice;
+    }
     ID3D12DescriptorHeap *SrvHeap() { return g_pd3dSrvDescHeap; }
     ID3D12GraphicsCommandList *CommandList() { return g_pd3dCommandList; }
     void OnSize(HWND hWnd, UINT w, UINT h)
@@ -192,70 +255,6 @@ public:
             }
     }
 
-    void CleanupDeviceD3D()
-    {
-        CleanupRenderTarget();
-        if (g_pSwapChain)
-        {
-            g_pSwapChain->Release();
-            g_pSwapChain = NULL;
-        }
-        if (g_hSwapChainWaitableObject != NULL)
-        {
-            CloseHandle(g_hSwapChainWaitableObject);
-        }
-        for (UINT i = 0; i < g_frameContext.size(); i++)
-            if (g_frameContext[i].CommandAllocator)
-            {
-                g_frameContext[i].CommandAllocator.Reset();
-            }
-        if (g_pd3dCommandQueue)
-        {
-            g_pd3dCommandQueue->Release();
-            g_pd3dCommandQueue = NULL;
-        }
-        if (g_pd3dCommandList)
-        {
-            g_pd3dCommandList->Release();
-            g_pd3dCommandList = NULL;
-        }
-        if (g_pd3dRtvDescHeap)
-        {
-            g_pd3dRtvDescHeap->Release();
-            g_pd3dRtvDescHeap = NULL;
-        }
-        if (g_pd3dSrvDescHeap)
-        {
-            g_pd3dSrvDescHeap->Release();
-            g_pd3dSrvDescHeap = NULL;
-        }
-        if (g_fence)
-        {
-            g_fence->Release();
-            g_fence = NULL;
-        }
-        if (g_fenceEvent)
-        {
-            CloseHandle(g_fenceEvent);
-            g_fenceEvent = NULL;
-        }
-        if (g_pd3dDevice)
-        {
-            g_pd3dDevice->Release();
-            g_pd3dDevice = NULL;
-        }
-
-#ifdef DX12_ENABLE_DEBUG_LAYER
-        {
-            ComPtr<IDXGIDebug1> pDebug;
-            if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
-            {
-                pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
-            }
-        }
-#endif
-    }
-
     FrameContext *WaitForNextFrameResources()
     {
         UINT nextFrameIndex = g_frameIndex + 1;
@@ -368,10 +367,6 @@ void D3DRenderer::OnSize(HWND hWnd, UINT w, UINT h)
 void D3DRenderer::WaitForLastSubmittedFrame()
 {
     m_impl->WaitForLastSubmittedFrame();
-}
-void D3DRenderer::CleanupDeviceD3D()
-{
-    m_impl->CleanupDeviceD3D();
 }
 FrameContext *D3DRenderer::Begin(const float *clear_color)
 {

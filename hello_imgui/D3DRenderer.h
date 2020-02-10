@@ -21,7 +21,6 @@ public:
     bool CreateDeviceD3D(HWND hWnd);
     void OnSize(HWND hWnd, UINT w, UINT h);
     void WaitForLastSubmittedFrame();
-    void CleanupDeviceD3D();
     FrameContext *Begin(const float *clear_color);
     void End(FrameContext *frameCtxt);
 };

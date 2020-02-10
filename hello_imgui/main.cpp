@@ -76,7 +76,6 @@ int main(int, char **)
     // Initialize Direct3D
     if (!renderer.CreateDeviceD3D(hwnd))
     {
-        renderer.CleanupDeviceD3D();
         ::UnregisterClass(wc.lpszClassName, wc.hInstance);
         return 1;
     }
@@ -197,7 +196,6 @@ int main(int, char **)
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    renderer.CleanupDeviceD3D();
     ::DestroyWindow(hwnd);
     ::UnregisterClass(wc.lpszClassName, wc.hInstance);
 
