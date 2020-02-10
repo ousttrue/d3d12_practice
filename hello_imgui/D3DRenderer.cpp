@@ -7,6 +7,10 @@
 #pragma comment(lib, "dxguid.lib")
 #endif
 
+D3DRenderer::D3DRenderer(int frameCount)
+    : g_frameContext(frameCount)
+{
+}
 
 void D3DRenderer::OnSize(HWND hWnd, UINT w, UINT h)
 {
@@ -24,7 +28,7 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
     DXGI_SWAP_CHAIN_DESC1 sd;
     {
         ZeroMemory(&sd, sizeof(sd));
-        sd.BufferCount = NUM_BACK_BUFFERS;
+        sd.BufferCount = (UINT)g_frameContext.size();
         sd.Width = 0;
         sd.Height = 0;
         sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -54,7 +58,7 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        desc.NumDescriptors = NUM_BACK_BUFFERS;
+        desc.NumDescriptors = (UINT)g_frameContext.size();
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.NodeMask = 1;
         if (g_pd3dDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_pd3dRtvDescHeap)) != S_OK)
@@ -62,9 +66,9 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
 
         SIZE_T rtvDescriptorSize = g_pd3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = g_pd3dRtvDescHeap->GetCPUDescriptorHandleForHeapStart();
-        for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
+        for (UINT i = 0; i < g_frameContext.size(); i++)
         {
-            g_mainRenderTargetDescriptor[i] = rtvHandle;
+            g_frameContext[i].g_mainRenderTargetDescriptor = rtvHandle;
             rtvHandle.ptr += rtvDescriptorSize;
         }
     }
@@ -87,7 +91,7 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
             return false;
     }
 
-    for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+    for (UINT i = 0; i < g_frameContext.size(); i++)
         if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_frameContext[i].CommandAllocator)) != S_OK)
             return false;
 
@@ -111,7 +115,7 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
             return false;
         swapChain1->Release();
         dxgiFactory->Release();
-        g_pSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
+        g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
         g_hSwapChainWaitableObject = g_pSwapChain->GetFrameLatencyWaitableObject();
     }
 
@@ -121,18 +125,18 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
 
 void D3DRenderer::CreateRenderTarget()
 {
-    for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
+    for (UINT i = 0; i < g_frameContext.size(); i++)
     {
         ID3D12Resource *pBackBuffer = NULL;
         g_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-        g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, g_mainRenderTargetDescriptor[i]);
-        g_mainRenderTargetResource[i] = pBackBuffer;
+        g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, g_frameContext[i].g_mainRenderTargetDescriptor);
+        g_frameContext[i].g_mainRenderTargetResource = pBackBuffer;
     }
 }
 
 void D3DRenderer::WaitForLastSubmittedFrame()
 {
-    FrameContext *frameCtxt = &g_frameContext[g_frameIndex % NUM_FRAMES_IN_FLIGHT];
+    FrameContext *frameCtxt = &g_frameContext[g_frameIndex % g_frameContext.size()];
 
     UINT64 fenceValue = frameCtxt->FenceValue;
     if (fenceValue == 0)
@@ -150,11 +154,11 @@ void D3DRenderer::CleanupRenderTarget()
 {
     WaitForLastSubmittedFrame();
 
-    for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
-        if (g_mainRenderTargetResource[i])
+    for (UINT i = 0; i < g_frameContext.size(); i++)
+        if (g_frameContext[i].g_mainRenderTargetResource)
         {
-            g_mainRenderTargetResource[i]->Release();
-            g_mainRenderTargetResource[i] = NULL;
+            g_frameContext[i].g_mainRenderTargetResource->Release();
+            g_frameContext[i].g_mainRenderTargetResource = NULL;
         }
 }
 
@@ -170,7 +174,7 @@ void D3DRenderer::CleanupDeviceD3D()
     {
         CloseHandle(g_hSwapChainWaitableObject);
     }
-    for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+    for (UINT i = 0; i < g_frameContext.size(); i++)
         if (g_frameContext[i].CommandAllocator)
         {
             g_frameContext[i].CommandAllocator->Release();
@@ -230,7 +234,7 @@ FrameContext *D3DRenderer::WaitForNextFrameResources()
     HANDLE waitableObjects[] = {g_hSwapChainWaitableObject, NULL};
     DWORD numWaitableObjects = 1;
 
-    FrameContext *frameCtxt = &g_frameContext[nextFrameIndex % NUM_FRAMES_IN_FLIGHT];
+    FrameContext *frameCtxt = &g_frameContext[nextFrameIndex % g_frameContext.size()];
     UINT64 fenceValue = frameCtxt->FenceValue;
     if (fenceValue != 0) // means no fence was signaled
     {
@@ -264,7 +268,7 @@ void D3DRenderer::ResizeSwapChain(HWND hWnd, int width, int height)
     swapChain1->Release();
     dxgiFactory->Release();
 
-    g_pSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
+    g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
 
     g_hSwapChainWaitableObject = g_pSwapChain->GetFrameLatencyWaitableObject();
     assert(g_hSwapChainWaitableObject != NULL);
@@ -278,15 +282,15 @@ FrameContext *D3DRenderer::Begin(const float *clear_color)
 
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = g_mainRenderTargetResource[backBufferIdx];
+    barrier.Transition.pResource = g_frameContext[backBufferIdx].g_mainRenderTargetResource;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     g_pd3dCommandList->Reset(frameCtxt->CommandAllocator, NULL);
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
-    g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], clear_color, 0, NULL);
-    g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, NULL);
+    g_pd3dCommandList->ClearRenderTargetView(g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, clear_color, 0, NULL);
+    g_pd3dCommandList->OMSetRenderTargets(1, &g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, FALSE, NULL);
     g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
 
     return frameCtxt;

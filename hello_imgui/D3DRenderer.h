@@ -2,20 +2,19 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
+#include <vector>
 
 struct FrameContext
 {
-    ID3D12CommandAllocator *CommandAllocator;
-    UINT64 FenceValue;
+    ID3D12CommandAllocator *CommandAllocator=NULL;
+    UINT64 FenceValue=0;
+    ID3D12Resource *g_mainRenderTargetResource=NULL;
+    D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor = {};
 };
 class D3DRenderer
 {
-public:
-    static int const NUM_BACK_BUFFERS = 3;
-    static int const NUM_FRAMES_IN_FLIGHT = 3;
-
 private:
-    FrameContext g_frameContext[NUM_FRAMES_IN_FLIGHT] = {};
+    std::vector<FrameContext> g_frameContext;
     UINT g_frameIndex = 0;
 
     ID3D12Device *g_pd3dDevice = NULL;
@@ -28,11 +27,10 @@ private:
     UINT64 g_fenceLastSignaledValue = 0;
     IDXGISwapChain3 *g_pSwapChain = NULL;
     HANDLE g_hSwapChainWaitableObject = NULL;
-    ID3D12Resource *g_mainRenderTargetResource[NUM_BACK_BUFFERS] = {};
-    D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
     D3D12_RESOURCE_BARRIER barrier = {};
 
 public:
+    D3DRenderer(int frameCount);
     ID3D12Device *Device() { return g_pd3dDevice; }
     ID3D12DescriptorHeap *SrvHeap() { return g_pd3dSrvDescHeap; }
     ID3D12GraphicsCommandList *CommandList() { return g_pd3dCommandList; }

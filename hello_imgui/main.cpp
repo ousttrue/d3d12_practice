@@ -8,6 +8,7 @@
 #include "imgui_impl_dx12.h"
 #include <tchar.h>
 
+static int const NUM_BACK_BUFFERS = 3;
 
 struct Gwlp
 {
@@ -65,7 +66,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 // Main code
 int main(int, char **)
 {
-    D3DRenderer renderer;
+    D3DRenderer renderer(NUM_BACK_BUFFERS);
 
     // Create application window
     WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("ImGui Example"), NULL};
@@ -98,7 +99,7 @@ int main(int, char **)
 
     // Setup Platform/Renderer bindings
     ImGui_ImplWin32_Init(hwnd);
-    ImGui_ImplDX12_Init(renderer.Device(), D3DRenderer::NUM_FRAMES_IN_FLIGHT,
+    ImGui_ImplDX12_Init(renderer.Device(), NUM_BACK_BUFFERS,
                         DXGI_FORMAT_R8G8B8A8_UNORM, renderer.SrvHeap(),
                         renderer.SrvHeap()->GetCPUDescriptorHandleForHeapStart(),
                         renderer.SrvHeap()->GetGPUDescriptorHandleForHeapStart());
@@ -183,10 +184,12 @@ int main(int, char **)
         }
 
         // Rendering
-        auto frameCtxt = renderer.Begin(&clear_color.x);
-        ImGui::Render();
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), renderer.CommandList());
-        renderer.End(frameCtxt);
+        {
+            auto frameCtxt = renderer.Begin(&clear_color.x);
+            ImGui::Render();
+            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), renderer.CommandList());
+            renderer.End(frameCtxt);
+        }
     }
 
     renderer.WaitForLastSubmittedFrame();
