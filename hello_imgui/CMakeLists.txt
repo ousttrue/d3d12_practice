@@ -20,3 +20,4 @@ target_compile_definitions(${TARGET_NAME} PRIVATE
     DEBUG
     DX12_ENABLE_DEBUG_LAYER
     )
+set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 20)

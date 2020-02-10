@@ -12,6 +12,7 @@
         "HRESULT",
         "HWND",
         "IDXGI",
+        "IMGUI",
         "LPARAM",
         "LPCREATESTRUCT",
         "LPSTR",
