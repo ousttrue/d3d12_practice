@@ -96,7 +96,7 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
         if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_frameContext[i].CommandAllocator)) != S_OK)
             return false;
 
-    if (g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_frameContext[0].CommandAllocator, NULL, IID_PPV_ARGS(&g_pd3dCommandList)) != S_OK ||
+    if (g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_frameContext[0].CommandAllocator.Get(), NULL, IID_PPV_ARGS(&g_pd3dCommandList)) != S_OK ||
         g_pd3dCommandList->Close() != S_OK)
         return false;
 
@@ -175,8 +175,7 @@ void D3DRenderer::CleanupDeviceD3D()
     for (UINT i = 0; i < g_frameContext.size(); i++)
         if (g_frameContext[i].CommandAllocator)
         {
-            g_frameContext[i].CommandAllocator->Release();
-            g_frameContext[i].CommandAllocator = NULL;
+            g_frameContext[i].CommandAllocator.Reset();
         }
     if (g_pd3dCommandQueue)
     {
@@ -284,7 +283,7 @@ FrameContext *D3DRenderer::Begin(const float *clear_color)
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    g_pd3dCommandList->Reset(frameCtxt->CommandAllocator, NULL);
+    g_pd3dCommandList->Reset(frameCtxt->CommandAllocator.Get(), NULL);
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
     g_pd3dCommandList->ClearRenderTargetView(g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, clear_color, 0, NULL);
     g_pd3dCommandList->OMSetRenderTargets(1, &g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, FALSE, NULL);

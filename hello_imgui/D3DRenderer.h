@@ -9,7 +9,7 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 struct FrameContext
 {
-    ID3D12CommandAllocator *CommandAllocator = NULL;
+    ComPtr<ID3D12CommandAllocator> CommandAllocator;
     UINT64 FenceValue = 0;
     ComPtr<ID3D12Resource> g_mainRenderTargetResource;
     D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor = {};
