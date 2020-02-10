@@ -21,12 +21,12 @@ private:
     std::vector<FrameContext> g_frameContext;
     UINT g_frameIndex = 0;
 
-    ID3D12Device *g_pd3dDevice = NULL;
-    ID3D12DescriptorHeap *g_pd3dRtvDescHeap = NULL;
-    ID3D12DescriptorHeap *g_pd3dSrvDescHeap = NULL;
-    ID3D12CommandQueue *g_pd3dCommandQueue = NULL;
-    ID3D12GraphicsCommandList *g_pd3dCommandList = NULL;
-    ID3D12Fence *g_fence = NULL;
+    ComPtr<ID3D12Device> g_pd3dDevice;
+    ComPtr<ID3D12DescriptorHeap> g_pd3dRtvDescHeap;
+    ComPtr<ID3D12DescriptorHeap> g_pd3dSrvDescHeap;
+    ComPtr<ID3D12CommandQueue> g_pd3dCommandQueue;
+    ComPtr<ID3D12GraphicsCommandList> g_pd3dCommandList;
+    ComPtr<ID3D12Fence> g_fence;
     HANDLE g_fenceEvent = NULL;
     UINT64 g_fenceLastSignaledValue = 0;
     IDXGISwapChain3 *g_pSwapChain = NULL;
@@ -55,40 +55,13 @@ public:
             {
                 g_frameContext[i].CommandAllocator.Reset();
             }
-        if (g_pd3dCommandQueue)
-        {
-            g_pd3dCommandQueue->Release();
-            g_pd3dCommandQueue = NULL;
-        }
-        if (g_pd3dCommandList)
-        {
-            g_pd3dCommandList->Release();
-            g_pd3dCommandList = NULL;
-        }
-        if (g_pd3dRtvDescHeap)
-        {
-            g_pd3dRtvDescHeap->Release();
-            g_pd3dRtvDescHeap = NULL;
-        }
-        if (g_pd3dSrvDescHeap)
-        {
-            g_pd3dSrvDescHeap->Release();
-            g_pd3dSrvDescHeap = NULL;
-        }
-        if (g_fence)
-        {
-            g_fence->Release();
-            g_fence = NULL;
-        }
+
+
+
         if (g_fenceEvent)
         {
             CloseHandle(g_fenceEvent);
             g_fenceEvent = NULL;
-        }
-        if (g_pd3dDevice)
-        {
-            g_pd3dDevice->Release();
-            g_pd3dDevice = NULL;
         }
 
 #ifdef DX12_ENABLE_DEBUG_LAYER
@@ -103,10 +76,10 @@ public:
     }
     ID3D12Device *Device()
     {
-        return g_pd3dDevice;
+        return g_pd3dDevice.Get();
     }
-    ID3D12DescriptorHeap *SrvHeap() { return g_pd3dSrvDescHeap; }
-    ID3D12GraphicsCommandList *CommandList() { return g_pd3dCommandList; }
+    ID3D12DescriptorHeap *SrvHeap() { return g_pd3dSrvDescHeap.Get(); }
+    ID3D12GraphicsCommandList *CommandList() { return g_pd3dCommandList.Get(); }
     void OnSize(HWND hWnd, UINT w, UINT h)
     {
         if (g_pd3dDevice)
@@ -206,7 +179,7 @@ public:
             ComPtr<IDXGIFactory4> dxgiFactory;
             ComPtr<IDXGISwapChain1> swapChain1;
             if (CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)) != S_OK ||
-                dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1) != S_OK ||
+                dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue.Get(), hWnd, &sd, NULL, NULL, &swapChain1) != S_OK ||
                 swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK)
                 return false;
             g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
@@ -292,7 +265,7 @@ public:
         CloseHandle(g_hSwapChainWaitableObject);
 
         ComPtr<IDXGISwapChain1> swapChain1;
-        dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1);
+        dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue.Get(), hWnd, &sd, NULL, NULL, &swapChain1);
         swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain));
 
         g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
@@ -318,7 +291,7 @@ public:
         g_pd3dCommandList->ResourceBarrier(1, &barrier);
         g_pd3dCommandList->ClearRenderTargetView(g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, clear_color, 0, NULL);
         g_pd3dCommandList->OMSetRenderTargets(1, &g_frameContext[backBufferIdx].g_mainRenderTargetDescriptor, FALSE, NULL);
-        g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
+        g_pd3dCommandList->SetDescriptorHeaps(1, g_pd3dSrvDescHeap.GetAddressOf());
 
         return frameCtxt;
     }
@@ -330,13 +303,13 @@ public:
         g_pd3dCommandList->ResourceBarrier(1, &barrier);
         g_pd3dCommandList->Close();
 
-        g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList *const *)&g_pd3dCommandList);
+        g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList *const *)g_pd3dCommandList.GetAddressOf());
 
         g_pSwapChain->Present(1, 0); // Present with vsync
         //g_pSwapChain->Present(0, 0); // Present without vsync
 
         UINT64 fenceValue = g_fenceLastSignaledValue + 1;
-        g_pd3dCommandQueue->Signal(g_fence, fenceValue);
+        g_pd3dCommandQueue->Signal(g_fence.Get(), fenceValue);
         g_fenceLastSignaledValue = fenceValue;
         frameCtxt->FenceValue = fenceValue;
     }
