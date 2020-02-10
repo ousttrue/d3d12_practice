@@ -43,11 +43,12 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
     }
 
 #ifdef DX12_ENABLE_DEBUG_LAYER
-    ID3D12Debug *pdx12Debug = NULL;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pdx12Debug))))
     {
-        pdx12Debug->EnableDebugLayer();
-        pdx12Debug->Release();
+        ComPtr<ID3D12Debug> pdx12Debug;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pdx12Debug))))
+        {
+            pdx12Debug->EnableDebugLayer();
+        }
     }
 #endif
 
@@ -107,14 +108,12 @@ bool D3DRenderer::CreateDeviceD3D(HWND hWnd)
         return false;
 
     {
-        IDXGIFactory4 *dxgiFactory = NULL;
-        IDXGISwapChain1 *swapChain1 = NULL;
+        ComPtr<IDXGIFactory4> dxgiFactory;
+        ComPtr<IDXGISwapChain1> swapChain1;
         if (CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)) != S_OK ||
             dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1) != S_OK ||
             swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK)
             return false;
-        swapChain1->Release();
-        dxgiFactory->Release();
         g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
         g_hSwapChainWaitableObject = g_pSwapChain->GetFrameLatencyWaitableObject();
     }
@@ -127,9 +126,9 @@ void D3DRenderer::CreateRenderTarget()
 {
     for (UINT i = 0; i < g_frameContext.size(); i++)
     {
-        ID3D12Resource *pBackBuffer = NULL;
+        ComPtr<ID3D12Resource> pBackBuffer;
         g_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-        g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, g_frameContext[i].g_mainRenderTargetDescriptor);
+        g_pd3dDevice->CreateRenderTargetView(pBackBuffer.Get(), NULL, g_frameContext[i].g_mainRenderTargetDescriptor);
         g_frameContext[i].g_mainRenderTargetResource = pBackBuffer;
     }
 }
@@ -157,8 +156,7 @@ void D3DRenderer::CleanupRenderTarget()
     for (UINT i = 0; i < g_frameContext.size(); i++)
         if (g_frameContext[i].g_mainRenderTargetResource)
         {
-            g_frameContext[i].g_mainRenderTargetResource->Release();
-            g_frameContext[i].g_mainRenderTargetResource = NULL;
+            g_frameContext[i].g_mainRenderTargetResource.Reset();
         }
 }
 
@@ -217,11 +215,12 @@ void D3DRenderer::CleanupDeviceD3D()
     }
 
 #ifdef DX12_ENABLE_DEBUG_LAYER
-    IDXGIDebug1 *pDebug = NULL;
-    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
     {
-        pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
-        pDebug->Release();
+        ComPtr<IDXGIDebug1> pDebug;
+        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+        {
+            pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
+        }
     }
 #endif
 }
@@ -256,17 +255,15 @@ void D3DRenderer::ResizeSwapChain(HWND hWnd, int width, int height)
     sd.Width = width;
     sd.Height = height;
 
-    IDXGIFactory4 *dxgiFactory = NULL;
+    ComPtr<IDXGIFactory4> dxgiFactory;
     g_pSwapChain->GetParent(IID_PPV_ARGS(&dxgiFactory));
 
     g_pSwapChain->Release();
     CloseHandle(g_hSwapChainWaitableObject);
 
-    IDXGISwapChain1 *swapChain1 = NULL;
+    ComPtr<IDXGISwapChain1> swapChain1;
     dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1);
     swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain));
-    swapChain1->Release();
-    dxgiFactory->Release();
 
     g_pSwapChain->SetMaximumFrameLatency((UINT)g_frameContext.size());
 
@@ -282,7 +279,7 @@ FrameContext *D3DRenderer::Begin(const float *clear_color)
 
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = g_frameContext[backBufferIdx].g_mainRenderTargetResource;
+    barrier.Transition.pResource = g_frameContext[backBufferIdx].g_mainRenderTargetResource.Get();
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;

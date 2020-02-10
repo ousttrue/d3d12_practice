@@ -4,11 +4,14 @@
 #include <wrl/client.h>
 #include <vector>
 
+template <class T>
+using ComPtr = Microsoft::WRL::ComPtr<T>;
+
 struct FrameContext
 {
-    ID3D12CommandAllocator *CommandAllocator=NULL;
-    UINT64 FenceValue=0;
-    ID3D12Resource *g_mainRenderTargetResource=NULL;
+    ID3D12CommandAllocator *CommandAllocator = NULL;
+    UINT64 FenceValue = 0;
+    ComPtr<ID3D12Resource> g_mainRenderTargetResource;
     D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor = {};
 };
 class D3DRenderer
@@ -40,6 +43,7 @@ public:
     void CleanupDeviceD3D();
     FrameContext *Begin(const float *clear_color);
     void End(FrameContext *frameCtxt);
+
 private:
     FrameContext *WaitForNextFrameResources();
     void CleanupRenderTarget();
