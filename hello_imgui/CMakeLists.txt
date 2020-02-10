@@ -16,3 +16,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     d3d12
     dxgi
     )
+target_compile_definitions(${TARGET_NAME} PRIVATE
+    DEBUG
+    DX12_ENABLE_DEBUG_LAYER
+    )
