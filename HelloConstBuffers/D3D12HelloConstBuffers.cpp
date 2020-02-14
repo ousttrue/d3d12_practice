@@ -11,10 +11,6 @@ std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
-// Note that while ComPtr is used to manage the lifetime of resources on the CPU,
-// it has no understanding of the lifetime of resources on the GPU. Apps must account
-// for the GPU lifetime of resources to avoid destroying objects that may still be
-// referenced by the GPU.
 template<class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -34,8 +30,6 @@ private:
     const HRESULT m_hr;
 };
 
-#define SAFE_RELEASE(p) if (p) (p)->Release()
-
 inline void ThrowIfFailed(HRESULT hr)
 {
     if (FAILED(hr))
@@ -43,18 +37,13 @@ inline void ThrowIfFailed(HRESULT hr)
         throw HrException(hr);
     }
 }
+
 class Impl
 {
     // Viewport dimensions.
     UINT m_width;
     UINT m_height;
     float m_aspectRatio;
-
-    // Root assets path.
-    std::wstring m_assetsPath;
-
-    // Window title.
-    std::wstring m_title;
 
     static const UINT FrameCount = 2;
 
@@ -98,10 +87,9 @@ class Impl
     UINT64 m_fenceValue;
 
 public:
-    Impl(UINT width, UINT height, std::wstring name)
+    Impl(UINT width, UINT height)
         : m_width(width),
           m_height(height),
-          m_title(name),
           m_frameIndex(0),
           m_pCbvDataBegin(nullptr),
           m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
@@ -109,10 +97,6 @@ public:
           m_rtvDescriptorSize(0),
           m_constantBufferData{}
     {
-        WCHAR assetsPath[512];
-        // GetAssetsPath(assetsPath, _countof(assetsPath));
-        m_assetsPath = assetsPath;
-
         m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     }
 
@@ -124,12 +108,6 @@ public:
         WaitForPreviousFrame();
 
         CloseHandle(m_fenceEvent);
-    }
-
-    // Helper function for resolving the full path of assets.
-    std::wstring GetAssetFullPath(LPCWSTR assetName)
-    {
-        return m_assetsPath + assetName;
     }
 
     // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
@@ -539,8 +517,8 @@ public:
     }
 };
 
-D3D12HelloConstBuffers::D3D12HelloConstBuffers(UINT width, UINT height, std::wstring name)
-    : m_impl(new Impl(width, height, name))
+D3D12HelloConstBuffers::D3D12HelloConstBuffers(UINT width, UINT height)
+    : m_impl(new Impl(width, height))
 {
 }
 

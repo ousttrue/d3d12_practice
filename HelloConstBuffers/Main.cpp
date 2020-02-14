@@ -85,7 +85,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     CommandLine cmd;
     cmd.Parse();
 
-    D3D12HelloConstBuffers sample(WIDTH, HEIGHT, WINDOW_TITLE);
+    D3D12HelloConstBuffers sample(WIDTH, HEIGHT);
     // return Win32Application::Run(&sample, hInstance, nCmdShow, cmd.m_title.c_str(), cmd.m_useWarpDevice);
 
     // Initialize the window class.
