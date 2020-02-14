@@ -21,6 +21,11 @@ Vertex VERTICES[] =
         {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
 const UINT VERTICES_BYTE_SIZE = sizeof(VERTICES);
 const UINT VERTEX_STRIDE = sizeof(Vertex);
+UINT INDICES[] =
+    {
+        0, 1, 2};
+const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
+const auto INDEX_FORMAT = DXGI_FORMAT_R16_UINT;
 
 class Impl
 {
@@ -61,7 +66,11 @@ public:
         m_rt->Initialize(factory, m_commandQueue, hwnd);
         m_scene->Initialize(m_device);
 
-        auto commandList = m_scene->SetVertices(m_device, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE, false);
+        auto commandList = m_scene->SetVertices(
+            m_device,
+            VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE,
+            INDICES, INDICES_BYTE_SIZE, INDEX_FORMAT,
+            false);
         if (commandList)
         {
             m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());

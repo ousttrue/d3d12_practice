@@ -8,6 +8,7 @@ add_executable(${TARGET_NAME} WIN32
 target_compile_definitions(${TARGET_NAME} PRIVATE
     UNICODE
     _UNICODE
+    NOMINMAX
     )
 target_include_directories(${TARGET_NAME} PRIVATE
     )   
