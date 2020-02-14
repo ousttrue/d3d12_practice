@@ -15,7 +15,7 @@ class CD3D12Scene
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     // App resources.
     ComPtr<ID3D12Resource> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+    ComPtr<ID3D12Resource> m_indexBuffer;
     ComPtr<ID3D12Resource> m_constantBuffer;
 
     float m_near = 0.1f;

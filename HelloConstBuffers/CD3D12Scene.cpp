@@ -16,6 +16,15 @@ struct Vertex
     XMFLOAT4 color;
 };
 
+// Define the geometry for a triangle.
+Vertex triangleVertices[] =
+    {
+        {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+        {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+        {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+
+const UINT vertexBufferSize = sizeof(triangleVertices);
+
 bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
 {
     ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
@@ -116,16 +125,6 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
 
     // Create the vertex buffer.
     {
-        float aspectRatio = 1.0f;
-        // Define the geometry for a triangle.
-        Vertex triangleVertices[] =
-            {
-                {{0.0f, 0.25f * aspectRatio, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-                {{0.25f, -0.25f * aspectRatio, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-                {{-0.25f, -0.25f * aspectRatio, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-
-        const UINT vertexBufferSize = sizeof(triangleVertices);
-
         // Note: using upload heaps to transfer static data like vert buffers is not
         // recommended. Every time the GPU needs it, the upload heap will be marshalled
         // over. Please read up on Default Heap usage. An upload heap is used here for
@@ -144,11 +143,6 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
         ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
         memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
         m_vertexBuffer->Unmap(0, nullptr);
-
-        // Initialize the vertex buffer view.
-        m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-        m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-        m_vertexBufferView.SizeInBytes = vertexBufferSize;
     }
 
     // Create the constant buffer.
@@ -230,6 +224,14 @@ ComPtr<ID3D12CommandList> CD3D12Scene::PopulateCommandList(CD3D12SwapChain *rt)
     rt->Begin(m_commandList, clearColor);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Initialize the vertex buffer view.
+
+    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{
+        .BufferLocation = m_vertexBuffer->GetGPUVirtualAddress(),
+        .SizeInBytes = vertexBufferSize,
+        .StrideInBytes = sizeof(Vertex),
+    };
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     m_commandList->DrawInstanced(3, 1, 0, 0);
 
