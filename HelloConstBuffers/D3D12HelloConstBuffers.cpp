@@ -11,7 +11,7 @@ std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
-template<class T>
+template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 inline std::string HrToString(HRESULT hr)
@@ -26,6 +26,7 @@ class HrException : public std::runtime_error
 public:
     HrException(HRESULT hr) : std::runtime_error(HrToString(hr)), m_hr(hr) {}
     HRESULT Error() const { return m_hr; }
+
 private:
     const HRESULT m_hr;
 };
@@ -71,17 +72,17 @@ class Impl
     ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
-    UINT m_rtvDescriptorSize;
+    UINT m_rtvDescriptorSize = 0;
 
     // App resources.
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     ComPtr<ID3D12Resource> m_constantBuffer;
-    SceneConstantBuffer m_constantBufferData;
-    UINT8 *m_pCbvDataBegin;
+    SceneConstantBuffer m_constantBufferData{};
+    UINT8 *m_pCbvDataBegin = nullptr;
 
     // Synchronization objects.
-    UINT m_frameIndex;
+    UINT m_frameIndex = 0;
     HANDLE m_fenceEvent;
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue;
@@ -90,19 +91,14 @@ public:
     Impl(UINT width, UINT height)
         : m_width(width),
           m_height(height),
-          m_frameIndex(0),
-          m_pCbvDataBegin(nullptr),
           m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
-          m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height)),
-          m_rtvDescriptorSize(0),
-          m_constantBufferData{}
+          m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height))
     {
         m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     }
 
     ~Impl()
     {
-
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForPreviousFrame();
