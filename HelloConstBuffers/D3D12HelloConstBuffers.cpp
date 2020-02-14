@@ -22,9 +22,8 @@ class Impl
     CD3D12Scene *m_scene = nullptr;
 
 public:
-    Impl(UINT width, UINT height)
-        : m_rt(new CD3D12SwapChain(width, height)),
-          m_scene(new CD3D12Scene)
+    Impl()
+        : m_rt(new CD3D12SwapChain), m_scene(new CD3D12Scene)
     {
     }
 
@@ -45,8 +44,14 @@ public:
         ThrowIfFailed(CreateDXGIFactory2(GetDxgiFactoryFlags(), IID_PPV_ARGS(&factory)));
 
         LoadPipeline(factory, useWarpDevice);
-        m_rt->Initialize(factory, m_device, m_commandQueue, hwnd);
-        m_scene->Initialize(m_device, m_rt->AspectRatio());
+        m_rt->Initialize(factory, m_commandQueue, hwnd);
+        m_scene->Initialize(m_device);
+    }
+
+    void OnSize(HWND hwnd, UINT width, UINT height)
+    {
+        WaitForPreviousFrame();
+        m_rt->Resize(m_commandQueue, hwnd, width, height);
     }
 
     // Load the rendering pipeline dependencies.
@@ -98,6 +103,7 @@ public:
     // Render the scene.
     void OnRender()
     {
+        m_rt->Prepare(m_device);
         auto commandList = m_scene->Update(m_rt);
         m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
         m_rt->Present();
@@ -125,14 +131,19 @@ public:
     }
 };
 
-D3D12HelloConstBuffers::D3D12HelloConstBuffers(UINT width, UINT height)
-    : m_impl(new Impl(width, height))
+D3D12HelloConstBuffers::D3D12HelloConstBuffers()
+    : m_impl(new Impl)
 {
 }
 
 D3D12HelloConstBuffers::~D3D12HelloConstBuffers()
 {
     delete m_impl;
+}
+
+void D3D12HelloConstBuffers::OnSize(HWND hwnd, UINT width, UINT height)
+{
+    m_impl->OnSize(hwnd, width, height);
 }
 
 void D3D12HelloConstBuffers::OnInit(HWND hwnd, bool useWarpDevice)

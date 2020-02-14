@@ -1,24 +1,19 @@
 #include "CD3D12SwapChain.h"
 #include "d3dhelper.h"
 
-CD3D12SwapChain::CD3D12SwapChain(int width, int height)
-    : m_width(width), m_height(height)
+CD3D12SwapChain::CD3D12SwapChain()
 {
-    m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-    m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height));
-    m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(width), static_cast<LONG>(height));
 }
 
-void CD3D12SwapChain::Initialize(
+void CD3D12SwapChain::Create(
     const ComPtr<IDXGIFactory4> &factory,
-    const ComPtr<ID3D12Device> &device,
-    const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd)
+    const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd, int width, int height)
 {
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.BufferCount = BACKBUFFER_COUNT;
-    swapChainDesc.Width = m_width;
-    swapChainDesc.Height = m_height;
+    swapChainDesc.Width = width;
+    swapChainDesc.Height = height;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -36,6 +31,41 @@ void CD3D12SwapChain::Initialize(
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
+    m_swapChain->GetDesc1(&swapChainDesc);
+    width = swapChainDesc.Width;
+    height = swapChainDesc.Height;
+    m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height));
+    m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(width), static_cast<LONG>(height));
+}
+
+void CD3D12SwapChain::Initialize(
+    const ComPtr<IDXGIFactory4> &factory,
+    const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd)
+{
+    Create(factory, commandQueue, hwnd, 0, 0);
+}
+
+void CD3D12SwapChain::Resize(const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd, int width, int height)
+{
+    ComPtr<IDXGIFactory4> factory;
+    m_swapChain->GetParent(IID_PPV_ARGS(&factory));
+
+    ////////////////////
+    // release !
+    ////////////////////
+    for (int i = 0; i < BACKBUFFER_COUNT; ++i)
+    {
+        m_renderTargets[i].Reset();
+    }
+    m_swapChain.Reset();
+
+    Create(factory, commandQueue, hwnd, width, height);
+}
+
+void CD3D12SwapChain::Prepare(const ComPtr<ID3D12Device> &device)
+{
+    if (!m_rtvHeap)
     {
         // Describe and create a render target view (RTV) descriptor heap.
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
@@ -45,8 +75,8 @@ void CD3D12SwapChain::Initialize(
         ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
         m_rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     }
-
     // Create frame resources.
+    if (!m_renderTargets[0])
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
@@ -60,7 +90,8 @@ void CD3D12SwapChain::Initialize(
     }
 }
 
-void CD3D12SwapChain::Begin(const ComPtr<ID3D12GraphicsCommandList> &commandList, const float *clearColor)
+void CD3D12SwapChain::Begin(
+    const ComPtr<ID3D12GraphicsCommandList> &commandList, const float *clearColor)
 {
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 

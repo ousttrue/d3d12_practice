@@ -26,7 +26,7 @@ class CD3D12Scene
     UINT8 *m_pCbvDataBegin = nullptr;
 
 public:
-    bool Initialize(const ComPtr<ID3D12Device> &device, float aspectRatio);
+    bool Initialize(const ComPtr<ID3D12Device> &device);
     ComPtr<ID3D12CommandList> Update(class CD3D12SwapChain *rt)
     {
         OnUpdate();

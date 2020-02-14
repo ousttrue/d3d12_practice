@@ -12,9 +12,7 @@ class CD3D12SwapChain
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     // Viewport dimensions.
-    UINT m_width;
-    UINT m_height;
-    float m_aspectRatio;
+    float m_aspectRatio = 1.0f;
 
     ComPtr<IDXGISwapChain3> m_swapChain;
     UINT m_frameIndex = 0;
@@ -25,12 +23,17 @@ class CD3D12SwapChain
     UINT m_rtvDescriptorSize = 0;
 
 public:
-    CD3D12SwapChain(int width, int height);
+    CD3D12SwapChain();
     float AspectRatio() const { return m_aspectRatio; }
+    void Create(
+        const ComPtr<IDXGIFactory4> &factory,
+        const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd, int width, int height);
     void Initialize(
         const ComPtr<IDXGIFactory4> &factory,
-        const ComPtr<ID3D12Device> &device,
         const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd);
+    void Resize(const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd, int width, int height);
+
+    void Prepare(const ComPtr<ID3D12Device> &device);
     void Begin(const ComPtr<ID3D12GraphicsCommandList> &commandList, const float *clearColor);
     void End(const ComPtr<ID3D12GraphicsCommandList> &commandList);
     void Present();

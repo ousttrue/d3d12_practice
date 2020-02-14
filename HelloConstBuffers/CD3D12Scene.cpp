@@ -14,7 +14,7 @@ struct Vertex
     DirectX::XMFLOAT4 color;
 };
 
-bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device, float aspectRatio)
+bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
 {
     ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 
@@ -114,6 +114,7 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device, float aspectRat
 
     // Create the vertex buffer.
     {
+        float aspectRatio = 1.0f;
         // Define the geometry for a triangle.
         Vertex triangleVertices[] =
             {

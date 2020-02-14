@@ -20,6 +20,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     }
         return 0;
 
+    case WM_SIZE:
+        if (wParam != SIZE_MINIMIZED)
+        {
+            pSample->OnSize(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
+        }
+        break;
+
     case WM_KEYDOWN:
         if (pSample)
         {
@@ -66,7 +73,7 @@ struct CommandLine
     }
 
     // Helper function for parsing any supplied command line args.
-    _Use_decl_annotations_ void ParseCommandLineArgs(WCHAR * argv[], int argc)
+    _Use_decl_annotations_ void ParseCommandLineArgs(WCHAR *argv[], int argc)
     {
         for (int i = 1; i < argc; ++i)
         {
@@ -85,8 +92,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     CommandLine cmd;
     cmd.Parse();
 
-    D3D12HelloConstBuffers sample(WIDTH, HEIGHT);
-    // return Win32Application::Run(&sample, hInstance, nCmdShow, cmd.m_title.c_str(), cmd.m_useWarpDevice);
+    D3D12HelloConstBuffers sample;
 
     // Initialize the window class.
     WNDCLASSEX windowClass = {0};
