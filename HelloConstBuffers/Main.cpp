@@ -9,7 +9,6 @@
 //
 //*********************************************************
 
-#include "stdafx.h"
 #include "D3D12HelloConstBuffers.h"
 
 int WIDTH = 1280;

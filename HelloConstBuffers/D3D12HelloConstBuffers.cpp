@@ -9,9 +9,9 @@
 //
 //*********************************************************
 
-#include "stdafx.h"
 #include "D3D12HelloConstBuffers.h"
 #include "DXSampleHelper.h"
+#include <d3dcompiler.h>
 
 std::string g_shaders =
 #include "shaders.hlsl"

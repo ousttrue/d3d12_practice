@@ -1,4 +1,10 @@
 #pragma once
+#include <d3d12.h>
+#include <dxgi1_4.h>
+#include <wrl/client.h>
+#include <DirectXMath.h>
+#include <string>
+#include "d3dx12.h"
 
 template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
