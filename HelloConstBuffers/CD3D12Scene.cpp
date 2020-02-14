@@ -4,14 +4,16 @@
 #include <string>
 #include <d3dcompiler.h>
 
+using namespace DirectX;
+
 std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
 struct Vertex
 {
-    DirectX::XMFLOAT3 position;
-    DirectX::XMFLOAT4 color;
+    XMFLOAT3 position;
+    XMFLOAT4 color;
 };
 
 bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
@@ -180,12 +182,15 @@ void CD3D12Scene::OnUpdate()
 {
     const float translationSpeed = 0.005f;
     const float offsetBounds = 1.25f;
-
-    m_constantBufferData.offset.x += translationSpeed;
-    if (m_constantBufferData.offset.x > offsetBounds)
+    m_x += translationSpeed;
+    if (m_x > offsetBounds)
     {
-        m_constantBufferData.offset.x = -offsetBounds;
+        m_x = -offsetBounds;
     }
+
+    auto m = XMMatrixTranslation(m_x, 0, 0);
+    XMStoreFloat4x4(&m_constantBufferData.world, m);
+
     memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 }
 

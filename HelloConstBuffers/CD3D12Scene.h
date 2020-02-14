@@ -18,9 +18,10 @@ class CD3D12Scene
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     ComPtr<ID3D12Resource> m_constantBuffer;
 
+    float m_x = 0;
     struct SceneConstantBuffer
     {
-        DirectX::XMFLOAT4 offset;
+        DirectX::XMFLOAT4X4 world;
     };
     SceneConstantBuffer m_constantBufferData{};
     UINT8 *m_pCbvDataBegin = nullptr;
