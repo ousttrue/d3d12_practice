@@ -45,7 +45,7 @@ public:
     {
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
-        WaitForPreviousFrame();
+        SyncFence();
 
         delete m_scene;
         delete m_rt;
@@ -61,12 +61,17 @@ public:
         m_rt->Initialize(factory, m_commandQueue, hwnd);
         m_scene->Initialize(m_device);
 
-        m_scene->SetVertices(m_device, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
+        auto commandList = m_scene->SetVertices(m_device, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE, false);
+        if (commandList)
+        {
+            m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
+            SyncFence();
+        }
     }
 
     void OnSize(HWND hwnd, UINT width, UINT height)
     {
-        WaitForPreviousFrame();
+        SyncFence();
         m_rt->Resize(m_commandQueue, hwnd, width, height);
         auto aspectRatio = m_rt->AspectRatio();
         m_scene->UpdateProjection(aspectRatio);
@@ -114,7 +119,7 @@ public:
             // Wait for the command list to execute; we are reusing the same command
             // list in our main loop but for now, we just want to wait for setup to
             // complete before continuing.
-            WaitForPreviousFrame();
+            SyncFence();
         }
     }
 
@@ -125,10 +130,10 @@ public:
         auto commandList = m_scene->Update(m_rt);
         m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
         m_rt->Present();
-        WaitForPreviousFrame();
+        SyncFence();
     }
 
-    void WaitForPreviousFrame()
+    void SyncFence()
     {
         // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
         // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering

@@ -134,14 +134,11 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     return true;
 }
 
-void CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device, const void *p, UINT byteLength, UINT stride)
+ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device, const void *p, UINT byteLength, UINT stride, bool isDynamic)
 {
     // Create the vertex buffer.
+    if (isDynamic)
     {
-        // Note: using upload heaps to transfer static data like vert buffers is not
-        // recommended. Every time the GPU needs it, the upload heap will be marshalled
-        // over. Please read up on Default Heap usage. An upload heap is used here for
-        // code simplicity and because there are very few verts to actually transfer.
         ThrowIfFailed(device->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
             D3D12_HEAP_FLAG_NONE,
@@ -156,12 +153,65 @@ void CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device, const void *p,
         ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
         memcpy(pVertexDataBegin, p, byteLength);
         m_vertexBuffer->Unmap(0, nullptr);
+    }
+    else
+    {
+        ThrowIfFailed(device->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(byteLength),
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&m_vertexBuffer)));
 
-        m_vertexBufferView = D3D12_VERTEX_BUFFER_VIEW{
-            .BufferLocation = m_vertexBuffer->GetGPUVirtualAddress(),
-            .SizeInBytes = byteLength,
-            .StrideInBytes = stride,
-        };
+        // ComPtr<ID3D12Resource> upload;
+        ThrowIfFailed(device->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(byteLength),
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_upload)));
+
+        // NAME_D3D12_OBJECT(m_vertexBuffer);
+
+        ThrowIfFailed(m_commandAllocator->Reset());
+
+        // However, when ExecuteCommandList() is called on a particular command
+        // list, that command list can then be reset at any time and must be before
+        // re-recording.
+        ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+
+        // Copy data to the intermediate upload heap and then schedule a copy
+        // from the upload heap to the vertex buffer.
+        D3D12_SUBRESOURCE_DATA vertexData = {};
+        vertexData.pData = p;
+        vertexData.RowPitch = byteLength;
+        vertexData.SlicePitch = stride;
+
+        UpdateSubresources<1>(m_commandList.Get(), m_vertexBuffer.Get(), m_upload.Get(), 0, 0, 1, &vertexData);
+        m_commandList->ResourceBarrier(
+            1,
+            &CD3DX12_RESOURCE_BARRIER::Transition(
+                m_vertexBuffer.Get(),
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+        m_commandList->Close();
+    }
+
+    m_vertexBufferView = D3D12_VERTEX_BUFFER_VIEW{
+        .BufferLocation = m_vertexBuffer->GetGPUVirtualAddress(),
+        .SizeInBytes = byteLength,
+        .StrideInBytes = stride,
+    };
+
+    if (isDynamic)
+    {
+        return nullptr;
+    }
+    else
+    {
+        return m_commandList;
     }
 }
 
