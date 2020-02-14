@@ -1,14 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
 #include "D3D12HelloConstBuffers.h"
 #include "DXSampleHelper.h"
 #include <d3dcompiler.h>
@@ -37,6 +26,12 @@ D3D12HelloConstBuffers::D3D12HelloConstBuffers(UINT width, UINT height, std::wst
 
 D3D12HelloConstBuffers::~D3D12HelloConstBuffers()
 {
+
+    // Ensure that the GPU is no longer referencing resources that are about to be
+    // cleaned up by the destructor.
+    WaitForPreviousFrame();
+
+    CloseHandle(m_fenceEvent);
 }
 
 // Helper function for resolving the full path of assets.
@@ -385,15 +380,6 @@ void D3D12HelloConstBuffers::OnRender()
     ThrowIfFailed(m_swapChain->Present(1, 0));
 
     WaitForPreviousFrame();
-}
-
-void D3D12HelloConstBuffers::OnDestroy()
-{
-    // Ensure that the GPU is no longer referencing resources that are about to be
-    // cleaned up by the destructor.
-    WaitForPreviousFrame();
-
-    CloseHandle(m_fenceEvent);
 }
 
 // Fill the command list with all the render commands and dependent state.

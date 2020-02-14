@@ -73,7 +73,7 @@ public:
     void OnInit(HWND hwnd, bool useWarpDevice);
     void OnUpdate();
     void OnRender();
-    void OnDestroy();
+
     void OnKeyDown(UINT8 /*key*/) {}
     void OnKeyUp(UINT8 /*key*/) {}
 

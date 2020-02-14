@@ -142,8 +142,6 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
         }
     }
 
-    sample.OnDestroy();
-
     // Return this part of the WM_QUIT message to Windows.
     return static_cast<char>(msg.wParam);
 }
