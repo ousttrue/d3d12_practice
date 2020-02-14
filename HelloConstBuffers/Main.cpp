@@ -1,14 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
 #include "D3D12HelloConstBuffers.h"
 
 int WIDTH = 1280;
@@ -48,8 +37,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_PAINT:
         if (pSample)
         {
-            pSample->OnUpdate();
-            pSample->OnRender();
+            pSample->OnFrame();
         }
         return 0;
 
@@ -60,7 +48,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
     // Handle any messages the switch statement didn't.
     return DefWindowProc(hWnd, message, wParam, lParam);
-}struct CommandLine
+}
+
+struct CommandLine
 {
     bool m_useWarpDevice = false;
     // Window title.
