@@ -64,7 +64,7 @@ public:
     void ParseCommandLineArgs(_In_reads_(argc) WCHAR *argv[], int argc);
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }
-    void OnInit(bool useWarpDevice);
+    void OnInit(HWND hwnd, bool useWarpDevice);
     void OnUpdate();
     void OnRender();
     void OnDestroy();
@@ -72,7 +72,7 @@ public:
     void OnKeyUp(UINT8 /*key*/) {}
 
 private:
-    void LoadPipeline(bool useWarpDevice);
+    void LoadPipeline(HWND hwnd, bool useWarpDevice);
     void LoadAssets();
     void PopulateCommandList();
     void WaitForPreviousFrame();

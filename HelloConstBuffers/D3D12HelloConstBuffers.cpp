@@ -10,7 +10,6 @@
 //*********************************************************
 
 #include "stdafx.h"
-#include "Win32Application.h"
 #include "D3D12HelloConstBuffers.h"
 #include "DXSampleHelper.h"
 
@@ -76,14 +75,14 @@ _Use_decl_annotations_ void D3D12HelloConstBuffers::GetHardwareAdapter(IDXGIFact
     *ppAdapter = adapter.Detach();
 }
 
-void D3D12HelloConstBuffers::OnInit(bool useWarpDevice)
+void D3D12HelloConstBuffers::OnInit(HWND hwnd, bool useWarpDevice)
 {
-    LoadPipeline(useWarpDevice);
+    LoadPipeline(hwnd, useWarpDevice);
     LoadAssets();
 }
 
 // Load the rendering pipeline dependencies.
-void D3D12HelloConstBuffers::LoadPipeline(bool useWarpDevice)
+void D3D12HelloConstBuffers::LoadPipeline(HWND hwnd, bool useWarpDevice)
 {
     UINT dxgiFactoryFlags = 0;
 
@@ -146,14 +145,14 @@ void D3D12HelloConstBuffers::LoadPipeline(bool useWarpDevice)
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
         m_commandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
-        Win32Application::GetHwnd(),
+        hwnd,
         &swapChainDesc,
         nullptr,
         nullptr,
         &swapChain));
 
     // This sample does not support fullscreen transitions.
-    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
+    ThrowIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
 
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();

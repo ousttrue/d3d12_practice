@@ -1,7 +1,6 @@
 set(TARGET_NAME HelloConstBuffers)
 add_executable(${TARGET_NAME} WIN32
     Main.cpp
-    Win32Application.cpp
     D3D12HelloConstBuffers.cpp
     stdafx.cpp
     shaders.hlsl
