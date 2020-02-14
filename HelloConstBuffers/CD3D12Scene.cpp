@@ -177,18 +177,28 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     return true;
 }
 
+void CD3D12Scene::UpdateProjection(float aspectRatio)
+{
+    // projection
+    {
+        auto m = XMMatrixPerspectiveFovLH(m_fovY, aspectRatio, m_near, m_far);
+        XMStoreFloat4x4(&m_constantBufferData.projection, m);
+    }
+
+    // view
+    {
+        auto m = XMMatrixTranslation(0, 0, 1);
+        XMStoreFloat4x4(&m_constantBufferData.view, m);
+    }
+}
+
 // Update frame-based values.
 void CD3D12Scene::OnUpdate()
 {
-    const float translationSpeed = 0.005f;
-    const float offsetBounds = 1.25f;
+    // update world
+    const float translationSpeed = 1.0f / 180.0f * DirectX::XM_PI;
     m_x += translationSpeed;
-    if (m_x > offsetBounds)
-    {
-        m_x = -offsetBounds;
-    }
-
-    auto m = XMMatrixTranslation(m_x, 0, 0);
+    auto m = XMMatrixRotationY(m_x);
     XMStoreFloat4x4(&m_constantBufferData.world, m);
 
     memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));

@@ -13,6 +13,8 @@ R""(
 cbuffer SceneConstantBuffer : register(b0)
 {
     float4x4 world;
+    float4x4 view;
+    float4x4 projection;
 };
 
 struct PSInput
@@ -25,7 +27,7 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 {
     PSInput result;
 
-    result.position = mul(world, position);
+    result.position = mul(projection, mul(view, mul(world, position)));
     result.color = color;
 
     return result;

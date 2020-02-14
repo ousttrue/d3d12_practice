@@ -52,6 +52,8 @@ public:
     {
         WaitForPreviousFrame();
         m_rt->Resize(m_commandQueue, hwnd, width, height);
+        auto aspectRatio = m_rt->AspectRatio();
+        m_scene->UpdateProjection(aspectRatio);
     }
 
     // Load the rendering pipeline dependencies.

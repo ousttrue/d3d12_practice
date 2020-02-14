@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
+#include <DirectXMath.h>
 #include "d3dx12.h"
 
 static const UINT BACKBUFFER_COUNT = 2;
@@ -25,6 +26,7 @@ class CD3D12SwapChain
 public:
     CD3D12SwapChain();
     float AspectRatio() const { return m_aspectRatio; }
+
     void Create(
         const ComPtr<IDXGIFactory4> &factory,
         const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd, int width, int height);
