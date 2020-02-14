@@ -14,6 +14,56 @@ std::string g_shaders =
 template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+static UINT GetDxgiFactoryFlags()
+{
+    UINT dxgiFactoryFlags = 0;
+
+#if defined(_DEBUG)
+    // Enable the debug layer (requires the Graphics Tools "optional feature").
+    // NOTE: Enabling the debug layer after device creation will invalidate the active device.
+    {
+        ComPtr<ID3D12Debug> debugController;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+        {
+            debugController->EnableDebugLayer();
+
+            // Enable additional debug layers.
+            dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+        }
+    }
+#endif
+
+    return dxgiFactoryFlags;
+}
+
+// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
+// If no such adapter can be found, *ppAdapter will be set to nullptr.
+static ComPtr<IDXGIAdapter1> GetHardwareAdapter(IDXGIFactory2 *pFactory)
+{
+    ComPtr<IDXGIAdapter1> adapter;
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+    {
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
+
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        {
+            // Don't select the Basic Render Driver adapter.
+            // If you want a software adapter, pass in "/warp" on the command line.
+            continue;
+        }
+
+        // Check to see if the adapter supports Direct3D 12, but don't create the
+        // actual device yet.
+        if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+        {
+            return adapter;
+        }
+    }
+
+    return nullptr;
+}
+
 inline std::string HrToString(HRESULT hr)
 {
     char s_str[64] = {};
@@ -106,36 +156,6 @@ public:
         CloseHandle(m_fenceEvent);
     }
 
-    // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
-    // If no such adapter can be found, *ppAdapter will be set to nullptr.
-    _Use_decl_annotations_ void GetHardwareAdapter(IDXGIFactory2 *pFactory, IDXGIAdapter1 **ppAdapter)
-    {
-        ComPtr<IDXGIAdapter1> adapter;
-        *ppAdapter = nullptr;
-
-        for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
-        {
-            DXGI_ADAPTER_DESC1 desc;
-            adapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            {
-                // Don't select the Basic Render Driver adapter.
-                // If you want a software adapter, pass in "/warp" on the command line.
-                continue;
-            }
-
-            // Check to see if the adapter supports Direct3D 12, but don't create the
-            // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-            {
-                break;
-            }
-        }
-
-        *ppAdapter = adapter.Detach();
-    }
-
     void OnInit(HWND hwnd, bool useWarpDevice)
     {
         LoadPipeline(hwnd, useWarpDevice);
@@ -145,22 +165,7 @@ public:
     // Load the rendering pipeline dependencies.
     void LoadPipeline(HWND hwnd, bool useWarpDevice)
     {
-        UINT dxgiFactoryFlags = 0;
-
-#if defined(_DEBUG)
-        // Enable the debug layer (requires the Graphics Tools "optional feature").
-        // NOTE: Enabling the debug layer after device creation will invalidate the active device.
-        {
-            ComPtr<ID3D12Debug> debugController;
-            if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-            {
-                debugController->EnableDebugLayer();
-
-                // Enable additional debug layers.
-                dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-            }
-        }
-#endif
+        UINT dxgiFactoryFlags = GetDxgiFactoryFlags();
 
         ComPtr<IDXGIFactory4> factory;
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
@@ -169,7 +174,6 @@ public:
         {
             ComPtr<IDXGIAdapter> warpAdapter;
             ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
-
             ThrowIfFailed(D3D12CreateDevice(
                 warpAdapter.Get(),
                 D3D_FEATURE_LEVEL_11_0,
@@ -177,9 +181,7 @@ public:
         }
         else
         {
-            ComPtr<IDXGIAdapter1> hardwareAdapter;
-            GetHardwareAdapter(factory.Get(), &hardwareAdapter);
-
+            ComPtr<IDXGIAdapter1> hardwareAdapter = GetHardwareAdapter(factory.Get());
             ThrowIfFailed(D3D12CreateDevice(
                 hardwareAdapter.Get(),
                 D3D_FEATURE_LEVEL_11_0,
@@ -190,7 +192,6 @@ public:
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
         ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
         // Describe and create the swap chain.
@@ -202,7 +203,6 @@ public:
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
-
         ComPtr<IDXGISwapChain1> swapChain;
         ThrowIfFailed(factory->CreateSwapChainForHwnd(
             m_commandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
@@ -211,10 +211,8 @@ public:
             nullptr,
             nullptr,
             &swapChain));
-
         // This sample does not support fullscreen transitions.
         ThrowIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
-
         ThrowIfFailed(swapChain.As(&m_swapChain));
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
