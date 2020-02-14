@@ -2,7 +2,8 @@ set(TARGET_NAME HelloConstBuffers)
 add_executable(${TARGET_NAME} WIN32
     Main.cpp
     D3D12HelloConstBuffers.cpp
-    shaders.hlsl
+    CD3D12Scene.cpp
+    CD3D12SwapChain.cpp
     )
 target_compile_definitions(${TARGET_NAME} PRIVATE
     UNICODE

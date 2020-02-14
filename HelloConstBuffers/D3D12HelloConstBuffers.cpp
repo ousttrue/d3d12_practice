@@ -3,12 +3,10 @@
 #include <dxgi1_4.h>
 #include <wrl/client.h>
 #include <DirectXMath.h>
-#include <d3dcompiler.h>
-#include <stdexcept>
 #include "d3dx12.h"
 #include "d3dhelper.h"
-#include "D3D12SwapChain.h"
-#include "D3D12Scene.h"
+#include "CD3D12SwapChain.h"
+#include "CD3D12Scene.h"
 
 class Impl
 {
@@ -20,13 +18,13 @@ class Impl
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue;
 
-    D3D12SwapChain *m_rt = nullptr;
-    D3D12Scene *m_scene = nullptr;
+    CD3D12SwapChain *m_rt = nullptr;
+    CD3D12Scene *m_scene = nullptr;
 
 public:
     Impl(UINT width, UINT height)
-        : m_rt(new D3D12SwapChain(width, height)),
-          m_scene(new D3D12Scene)
+        : m_rt(new CD3D12SwapChain(width, height)),
+          m_scene(new CD3D12Scene)
     {
     }
 
