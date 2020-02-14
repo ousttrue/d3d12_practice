@@ -1,49 +1,35 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
 #pragma once
 
-#include "DXSample.h"
+template <class T>
+using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-using namespace DirectX;
-
-// Note that while ComPtr is used to manage the lifetime of resources on the CPU,
-// it has no understanding of the lifetime of resources on the GPU. Apps must account
-// for the GPU lifetime of resources to avoid destroying objects that may still be
-// referenced by the GPU.
-// An example of this can be found in the class method: OnDestroy().
-using Microsoft::WRL::ComPtr;
-
-class D3D12HelloConstBuffers : public DXSample
+class D3D12HelloConstBuffers
 {
-public:
-    D3D12HelloConstBuffers(UINT width, UINT height, std::wstring name);
+    // Viewport dimensions.
+    UINT m_width;
+    UINT m_height;
+    float m_aspectRatio;
 
-    virtual void OnInit();
-    virtual void OnUpdate();
-    virtual void OnRender();
-    virtual void OnDestroy();
+    // Adapter info.
+    bool m_useWarpDevice;
 
-private:
+    // Root assets path.
+    std::wstring m_assetsPath;
+
+    // Window title.
+    std::wstring m_title;
+
     static const UINT FrameCount = 2;
 
     struct Vertex
     {
-        XMFLOAT3 position;
-        XMFLOAT4 color;
+        DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT4 color;
     };
 
     struct SceneConstantBuffer
     {
-        XMFLOAT4 offset;
+        DirectX::XMFLOAT4 offset;
     };
 
     // Pipeline objects.
@@ -66,7 +52,7 @@ private:
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     ComPtr<ID3D12Resource> m_constantBuffer;
     SceneConstantBuffer m_constantBufferData;
-    UINT8* m_pCbvDataBegin;
+    UINT8 *m_pCbvDataBegin;
 
     // Synchronization objects.
     UINT m_frameIndex;
@@ -74,8 +60,27 @@ private:
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue;
 
+public:
+    D3D12HelloConstBuffers(UINT width, UINT height, std::wstring name);
+    ~D3D12HelloConstBuffers();
+
+    void ParseCommandLineArgs(_In_reads_(argc) WCHAR *argv[], int argc);
+    UINT GetWidth() const { return m_width; }
+    UINT GetHeight() const { return m_height; }
+    const WCHAR *GetTitle() const { return m_title.c_str(); }
+    virtual void OnInit();
+    virtual void OnUpdate();
+    virtual void OnRender();
+    virtual void OnDestroy();
+    virtual void OnKeyDown(UINT8 /*key*/) {}
+    virtual void OnKeyUp(UINT8 /*key*/) {}
+
+private:
     void LoadPipeline();
     void LoadAssets();
     void PopulateCommandList();
     void WaitForPreviousFrame();
+    std::wstring GetAssetFullPath(LPCWSTR assetName);
+    void GetHardwareAdapter(_In_ IDXGIFactory2 *pFactory, _Outptr_result_maybenull_ IDXGIAdapter1 **ppAdapter);
+    void SetCustomWindowText(LPCWSTR text);
 };

@@ -28,5 +28,6 @@
         "uuidof",
         "verts",
         "wcsnicmp"
-    ]
+    ],
+    "C_Cpp.errorSquiggles": "Disabled"
 }

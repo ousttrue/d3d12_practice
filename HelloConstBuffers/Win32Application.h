@@ -11,14 +11,12 @@
 
 #pragma once
 
-#include "DXSample.h"
-
-class DXSample;
+class D3D12HelloConstBuffers;
 
 class Win32Application
 {
 public:
-    static int Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow);
+    static int Run(D3D12HelloConstBuffers* pSample, HINSTANCE hInstance, int nCmdShow);
     static HWND GetHwnd() { return m_hwnd; }
 
 protected:
