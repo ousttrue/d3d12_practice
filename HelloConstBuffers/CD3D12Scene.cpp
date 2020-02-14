@@ -10,21 +10,6 @@ std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT4 color;
-};
-
-// Define the geometry for a triangle.
-Vertex triangleVertices[] =
-    {
-        {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-        {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-        {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-
-const UINT vertexBufferSize = sizeof(triangleVertices);
-
 bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
 {
     ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
@@ -123,28 +108,6 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     // to record yet. The main loop expects it to be closed, so close it now.
     ThrowIfFailed(m_commandList->Close());
 
-    // Create the vertex buffer.
-    {
-        // Note: using upload heaps to transfer static data like vert buffers is not
-        // recommended. Every time the GPU needs it, the upload heap will be marshalled
-        // over. Please read up on Default Heap usage. An upload heap is used here for
-        // code simplicity and because there are very few verts to actually transfer.
-        ThrowIfFailed(device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_vertexBuffer)));
-
-        // Copy the triangle data to the vertex buffer.
-        UINT8 *pVertexDataBegin;
-        CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU.
-        ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
-        memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-        m_vertexBuffer->Unmap(0, nullptr);
-    }
-
     // Create the constant buffer.
     {
         ThrowIfFailed(device->CreateCommittedResource(
@@ -169,6 +132,37 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     }
 
     return true;
+}
+
+void CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device, const void *p, UINT byteLength, UINT stride)
+{
+    // Create the vertex buffer.
+    {
+        // Note: using upload heaps to transfer static data like vert buffers is not
+        // recommended. Every time the GPU needs it, the upload heap will be marshalled
+        // over. Please read up on Default Heap usage. An upload heap is used here for
+        // code simplicity and because there are very few verts to actually transfer.
+        ThrowIfFailed(device->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(byteLength),
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_vertexBuffer)));
+
+        // Copy the triangle data to the vertex buffer.
+        UINT8 *pVertexDataBegin;
+        CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU.
+        ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
+        memcpy(pVertexDataBegin, p, byteLength);
+        m_vertexBuffer->Unmap(0, nullptr);
+
+        m_vertexBufferView = D3D12_VERTEX_BUFFER_VIEW{
+            .BufferLocation = m_vertexBuffer->GetGPUVirtualAddress(),
+            .SizeInBytes = byteLength,
+            .StrideInBytes = stride,
+        };
+    }
 }
 
 void CD3D12Scene::UpdateProjection(float aspectRatio)
@@ -226,12 +220,6 @@ ComPtr<ID3D12CommandList> CD3D12Scene::PopulateCommandList(CD3D12SwapChain *rt)
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Initialize the vertex buffer view.
-
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{
-        .BufferLocation = m_vertexBuffer->GetGPUVirtualAddress(),
-        .SizeInBytes = vertexBufferSize,
-        .StrideInBytes = sizeof(Vertex),
-    };
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     m_commandList->DrawInstanced(3, 1, 0, 0);
 

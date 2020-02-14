@@ -15,6 +15,7 @@ class CD3D12Scene
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     // App resources.
     ComPtr<ID3D12Resource> m_vertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
     ComPtr<ID3D12Resource> m_indexBuffer;
     ComPtr<ID3D12Resource> m_constantBuffer;
 
@@ -42,6 +43,7 @@ public:
         return PopulateCommandList(rt);
     }
     void UpdateProjection(float aspectRatio);
+    void SetVertices(const ComPtr<ID3D12Device> &device, const void *p, UINT byteLength, UINT stride);
 
 private:
     void OnUpdate();

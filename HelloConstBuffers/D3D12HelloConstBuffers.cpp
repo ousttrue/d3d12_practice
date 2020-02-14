@@ -8,6 +8,20 @@
 #include "CD3D12SwapChain.h"
 #include "CD3D12Scene.h"
 
+struct Vertex
+{
+    DirectX::XMFLOAT3 position;
+    DirectX::XMFLOAT4 color;
+};
+// Define the geometry for a triangle.
+Vertex VERTICES[] =
+    {
+        {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+        {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+        {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+const UINT VERTICES_BYTE_SIZE = sizeof(VERTICES);
+const UINT VERTEX_STRIDE = sizeof(Vertex);
+
 class Impl
 {
     // Pipeline objects.
@@ -46,6 +60,8 @@ public:
         LoadPipeline(factory, useWarpDevice);
         m_rt->Initialize(factory, m_commandQueue, hwnd);
         m_scene->Initialize(m_device);
+
+        m_scene->SetVertices(m_device, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
     }
 
     void OnSize(HWND hwnd, UINT width, UINT height)
