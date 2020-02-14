@@ -15,14 +15,8 @@
 
 HWND Win32Application::m_hwnd = nullptr;
 
-int Win32Application::Run(D3D12HelloConstBuffers* pSample, HINSTANCE hInstance, int nCmdShow)
+int Win32Application::Run(D3D12HelloConstBuffers* pSample, HINSTANCE hInstance, int nCmdShow, LPCWSTR title, bool useWarpDevice)
 {
-    // Parse the command line parameters
-    int argc;
-    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    pSample->ParseCommandLineArgs(argv, argc);
-    LocalFree(argv);
-
     // Initialize the window class.
     WNDCLASSEX windowClass = { 0 };
     windowClass.cbSize = sizeof(WNDCLASSEX);
@@ -39,7 +33,7 @@ int Win32Application::Run(D3D12HelloConstBuffers* pSample, HINSTANCE hInstance, 
     // Create the window and store a handle to it.
     m_hwnd = CreateWindow(
         windowClass.lpszClassName,
-        pSample->GetTitle(),
+        title,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
@@ -51,7 +45,7 @@ int Win32Application::Run(D3D12HelloConstBuffers* pSample, HINSTANCE hInstance, 
         pSample);
 
     // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
-    pSample->OnInit();
+    pSample->OnInit(useWarpDevice);
 
     ShowWindow(m_hwnd, nCmdShow);
 

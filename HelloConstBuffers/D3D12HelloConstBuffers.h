@@ -10,9 +10,6 @@ class D3D12HelloConstBuffers
     UINT m_height;
     float m_aspectRatio;
 
-    // Adapter info.
-    bool m_useWarpDevice;
-
     // Root assets path.
     std::wstring m_assetsPath;
 
@@ -67,20 +64,18 @@ public:
     void ParseCommandLineArgs(_In_reads_(argc) WCHAR *argv[], int argc);
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }
-    const WCHAR *GetTitle() const { return m_title.c_str(); }
-    virtual void OnInit();
-    virtual void OnUpdate();
-    virtual void OnRender();
-    virtual void OnDestroy();
-    virtual void OnKeyDown(UINT8 /*key*/) {}
-    virtual void OnKeyUp(UINT8 /*key*/) {}
+    void OnInit(bool useWarpDevice);
+    void OnUpdate();
+    void OnRender();
+    void OnDestroy();
+    void OnKeyDown(UINT8 /*key*/) {}
+    void OnKeyUp(UINT8 /*key*/) {}
 
 private:
-    void LoadPipeline();
+    void LoadPipeline(bool useWarpDevice);
     void LoadAssets();
     void PopulateCommandList();
     void WaitForPreviousFrame();
     std::wstring GetAssetFullPath(LPCWSTR assetName);
     void GetHardwareAdapter(_In_ IDXGIFactory2 *pFactory, _Outptr_result_maybenull_ IDXGIAdapter1 **ppAdapter);
-    void SetCustomWindowText(LPCWSTR text);
 };

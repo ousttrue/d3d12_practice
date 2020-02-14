@@ -22,7 +22,6 @@ D3D12HelloConstBuffers::D3D12HelloConstBuffers(UINT width, UINT height, std::wst
     : m_width(width),
       m_height(height),
       m_title(name),
-      m_useWarpDevice(false),
       m_frameIndex(0),
       m_pCbvDataBegin(nullptr),
       m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
@@ -77,35 +76,14 @@ _Use_decl_annotations_ void D3D12HelloConstBuffers::GetHardwareAdapter(IDXGIFact
     *ppAdapter = adapter.Detach();
 }
 
-// Helper function for setting the window's title text.
-void D3D12HelloConstBuffers::SetCustomWindowText(LPCWSTR text)
+void D3D12HelloConstBuffers::OnInit(bool useWarpDevice)
 {
-    std::wstring windowText = m_title + L": " + text;
-    SetWindowText(Win32Application::GetHwnd(), windowText.c_str());
-}
-
-// Helper function for parsing any supplied command line args.
-_Use_decl_annotations_ void D3D12HelloConstBuffers::ParseCommandLineArgs(WCHAR *argv[], int argc)
-{
-    for (int i = 1; i < argc; ++i)
-    {
-        if (_wcsnicmp(argv[i], L"-warp", wcslen(argv[i])) == 0 ||
-            _wcsnicmp(argv[i], L"/warp", wcslen(argv[i])) == 0)
-        {
-            m_useWarpDevice = true;
-            m_title = m_title + L" (WARP)";
-        }
-    }
-}
-
-void D3D12HelloConstBuffers::OnInit()
-{
-    LoadPipeline();
+    LoadPipeline(useWarpDevice);
     LoadAssets();
 }
 
 // Load the rendering pipeline dependencies.
-void D3D12HelloConstBuffers::LoadPipeline()
+void D3D12HelloConstBuffers::LoadPipeline(bool useWarpDevice)
 {
     UINT dxgiFactoryFlags = 0;
 
@@ -127,7 +105,7 @@ void D3D12HelloConstBuffers::LoadPipeline()
     ComPtr<IDXGIFactory4> factory;
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
-    if (m_useWarpDevice)
+    if (useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
         ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
