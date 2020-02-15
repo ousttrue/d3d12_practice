@@ -1,6 +1,7 @@
 #include "ResourceItem.h"
 #include "d3dx12.h"
 #include "d3dhelper.h"
+#include "CommandList.h"
 
 ResourceItem::ResourceItem(const ComPtr<ID3D12Resource> &resource, D3D12_RESOURCE_STATES state)
     : m_resource(resource), m_state(state)
@@ -17,9 +18,9 @@ void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength)
     m_resource->Unmap(0, nullptr);
 }
 
-std::function<void()> ResourceItem::EnqueueTransition(const ComPtr<ID3D12GraphicsCommandList> &commandList, D3D12_RESOURCE_STATES state)
+void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_STATES state)
 {
-    commandList->ResourceBarrier(
+    commandList->Get()->ResourceBarrier(
         1,
         &CD3DX12_RESOURCE_BARRIER::Transition(
             m_resource.Get(),
@@ -27,7 +28,7 @@ std::function<void()> ResourceItem::EnqueueTransition(const ComPtr<ID3D12Graphic
             state));
 
     std::weak_ptr weak = shared_from_this();
-    return [weak, state]() {
+    auto callback = [weak, state]() {
         auto shared = weak.lock();
         if (shared)
         {
@@ -35,7 +36,7 @@ std::function<void()> ResourceItem::EnqueueTransition(const ComPtr<ID3D12Graphic
         }
     };
 
-    std::future
+    commandList->AddOnCompleted(callback);
 }
 
 std::shared_ptr<ResourceItem> ResourceItem::CreateUpload(const ComPtr<ID3D12Device> &device, UINT byteLength)

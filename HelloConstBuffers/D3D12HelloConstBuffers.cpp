@@ -7,6 +7,9 @@
 #include "d3dhelper.h"
 #include "CD3D12SwapChain.h"
 #include "CD3D12Scene.h"
+#include "CommandList.h"
+#include <list>
+#include <functional>
 
 struct Vertex
 {
@@ -73,9 +76,21 @@ public:
             false);
         if (commandList)
         {
-            m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
-            SyncFence();
+            Execute(commandList);
         }
+    }
+
+    void Execute(CommandList *commandList, bool present = false)
+    {
+        auto callbacks = commandList->Close();
+        ID3D12CommandList *list[] = {
+            commandList->Get()};
+        m_commandQueue->ExecuteCommandLists(_countof(list), list);
+        if (present)
+        {
+            m_rt->Present();
+        }
+        SyncFence(callbacks);
     }
 
     void OnSize(HWND hwnd, UINT width, UINT height)
@@ -137,12 +152,12 @@ public:
     {
         m_rt->Prepare(m_device);
         auto commandList = m_scene->Update(m_rt);
-        m_commandQueue->ExecuteCommandLists(1, commandList.GetAddressOf());
-        m_rt->Present();
+        Execute(commandList, true);
         SyncFence();
     }
 
-    void SyncFence()
+    using CallbackList = std::list<std::function<void()>>;
+    void SyncFence(const CallbackList &callbacks = CallbackList())
     {
         // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
         // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
@@ -159,6 +174,11 @@ public:
         {
             ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
             WaitForSingleObject(m_fenceEvent, INFINITE);
+        }
+
+        for (auto &callback: callbacks)
+        {
+            callback();
         }
     }
 };

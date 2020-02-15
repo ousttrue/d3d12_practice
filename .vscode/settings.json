@@ -2,7 +2,8 @@
     "files.associations": {
         "*.uss": "css",
         "*.ipp": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "memory": "cpp"
     },
     "cSpell.words": [
         "DCOMPILE",

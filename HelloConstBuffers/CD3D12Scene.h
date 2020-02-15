@@ -12,8 +12,7 @@ class CD3D12Scene
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
-    ComPtr<ID3D12CommandAllocator> m_commandAllocator;
-    ComPtr<ID3D12GraphicsCommandList> m_commandList;
+    class CommandList *m_commandList = nullptr;
     // App resources.
     std::shared_ptr<class ResourceItem> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
@@ -39,8 +38,10 @@ class CD3D12Scene
     UINT8 *m_pCbvDataBegin = nullptr;
 
 public:
+    CD3D12Scene();
+    ~CD3D12Scene();
     bool Initialize(const ComPtr<ID3D12Device> &device);
-    ComPtr<ID3D12CommandList> Update(class CD3D12SwapChain *rt)
+    class CommandList *Update(class CD3D12SwapChain *rt)
     {
         OnUpdate();
 
@@ -48,12 +49,12 @@ public:
         return PopulateCommandList(rt);
     }
     void UpdateProjection(float aspectRatio);
-    ComPtr<ID3D12CommandList> SetVertices(const ComPtr<ID3D12Device> &device,
-                                          const void *vertices, UINT vertexBytes, UINT vertexStride,
-                                          const void *indices, UINT indexBytes, DXGI_FORMAT indexStride,
-                                          bool isDynamic);
+    class CommandList *SetVertices(const ComPtr<ID3D12Device> &device,
+                                   const void *vertices, UINT vertexBytes, UINT vertexStride,
+                                   const void *indices, UINT indexBytes, DXGI_FORMAT indexStride,
+                                   bool isDynamic);
 
 private:
     void OnUpdate();
-    ComPtr<ID3D12CommandList> PopulateCommandList(class CD3D12SwapChain *rt);
+    class CommandList *PopulateCommandList(class CD3D12SwapChain *rt);
 };

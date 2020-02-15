@@ -2,6 +2,7 @@
 #include "CD3D12SwapChain.h"
 #include "d3dhelper.h"
 #include "ResourceItem.h"
+#include "CommandList.h"
 #include <string>
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -12,9 +13,19 @@ std::string g_shaders =
 #include "shaders.hlsl"
     ;
 
+CD3D12Scene::CD3D12Scene()
+    : m_commandList(new CommandList)
+{
+}
+
+CD3D12Scene::~CD3D12Scene()
+{
+    delete m_commandList;
+}
+
 bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
 {
-    ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+    m_commandList->Initialize(device, m_pipelineState);
 
     // Create descriptor heaps.
     {
@@ -103,13 +114,6 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
         ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
 
-    // Create the command list.
-    ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
-
-    // Command lists are created in the recording state, but there is nothing
-    // to record yet. The main loop expects it to be closed, so close it now.
-    ThrowIfFailed(m_commandList->Close());
-
     // Create the constant buffer.
     {
         ThrowIfFailed(device->CreateCommittedResource(
@@ -136,10 +140,10 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     return true;
 }
 
-ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device,
-                                                   const void *vertices, UINT vertexBytes, UINT vertexStride,
-                                                   const void *indices, UINT indexBytes, DXGI_FORMAT indexStride,
-                                                   bool isDynamic)
+CommandList *CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device,
+                                      const void *vertices, UINT vertexBytes, UINT vertexStride,
+                                      const void *indices, UINT indexBytes, DXGI_FORMAT indexStride,
+                                      bool isDynamic)
 {
     // Create the vertex buffer.
     if (isDynamic)
@@ -176,15 +180,9 @@ ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &d
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
             IID_PPV_ARGS(&m_upload)));
-
         // NAME_D3D12_OBJECT(m_vertexBuffer);
 
-        ThrowIfFailed(m_commandAllocator->Reset());
-
-        // However, when ExecuteCommandList() is called on a particular command
-        // list, that command list can then be reset at any time and must be before
-        // re-recording.
-        ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+        m_commandList->Reset(m_pipelineState);
 
         {
             // Copy data to the intermediate upload heap and then schedule a copy
@@ -194,10 +192,9 @@ ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &d
                 .RowPitch = vertexBytes,
                 .SlicePitch = vertexStride,
             };
-            UpdateSubresources<1>(m_commandList.Get(), m_vertexBuffer->Resource().Get(), m_upload.Get(), 0, 0, 1, &vertexData);
+            UpdateSubresources<1>(m_commandList->Get(), m_vertexBuffer->Resource().Get(), m_upload.Get(), 0, 0, 1, &vertexData);
 
-            auto callback = m_vertexBuffer->EnqueueTransition(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-            callback();
+            m_vertexBuffer->EnqueueTransition(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
         }
         {
             D3D12_SUBRESOURCE_DATA vertexData = {
@@ -205,15 +202,14 @@ ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &d
                 .RowPitch = indexBytes,
                 .SlicePitch = 2,
             };
-            UpdateSubresources<1>(m_commandList.Get(), m_indexBuffer.Get(), m_upload.Get(), 0, 0, 1, &vertexData);
-            m_commandList->ResourceBarrier(
+            UpdateSubresources<1>(m_commandList->Get(), m_indexBuffer.Get(), m_upload.Get(), 0, 0, 1, &vertexData);
+            m_commandList->Get()->ResourceBarrier(
                 1,
                 &CD3DX12_RESOURCE_BARRIER::Transition(
                     m_indexBuffer.Get(),
                     D3D12_RESOURCE_STATE_COPY_DEST,
                     D3D12_RESOURCE_STATE_INDEX_BUFFER));
         }
-        m_commandList->Close();
     }
 
     m_vertexBufferView = D3D12_VERTEX_BUFFER_VIEW{
@@ -266,40 +262,32 @@ void CD3D12Scene::OnUpdate()
 }
 
 // Fill the command list with all the render commands and dependent state.
-ComPtr<ID3D12CommandList> CD3D12Scene::PopulateCommandList(CD3D12SwapChain *rt)
+CommandList *CD3D12Scene::PopulateCommandList(CD3D12SwapChain *rt)
 {
-    // Command list allocators can only be reset when the associated
-    // command lists have finished execution on the GPU; apps should use
-    // fences to determine GPU execution progress.
-    ThrowIfFailed(m_commandAllocator->Reset());
+    m_commandList->Reset(m_pipelineState);
 
-    // However, when ExecuteCommandList() is called on a particular command
-    // list, that command list can then be reset at any time and must be before
-    // re-recording.
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+    auto commandList = m_commandList->Get();
 
     // Set necessary state.
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
     ID3D12DescriptorHeap *ppHeaps[] = {m_cbvHeap.Get()};
-    m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Record commands.
     const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
-    rt->Begin(m_commandList, clearColor);
+    rt->Begin(commandList, clearColor);
 
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Initialize the vertex buffer view.
-    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    m_commandList->DrawInstanced(3, 1, 0, 0);
+    commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    commandList->DrawInstanced(3, 1, 0, 0);
 
     // Indicate that the back buffer will now be used to present.
-    rt->End(m_commandList);
-
-    ThrowIfFailed(m_commandList->Close());
+    rt->End(commandList);
 
     return m_commandList;
 }
