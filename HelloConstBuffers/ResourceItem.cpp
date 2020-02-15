@@ -43,6 +43,31 @@ void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_ST
     commandList->AddOnCompleted(callback);
 }
 
+void ResourceItem::EnqueueUpload(CommandList *commandList,
+                                 const ComPtr<ID3D12Resource> &upload, 
+                                 const void *p, UINT byteLength, UINT stride)
+{
+    // Copy data to the intermediate upload heap and then schedule a copy
+    // from the upload heap to the vertex buffer.
+    D3D12_SUBRESOURCE_DATA vertexData = {
+        .pData = p,
+        .RowPitch = byteLength,
+        .SlicePitch = stride,
+    };
+    UpdateSubresources<1>(commandList->Get(), m_resource.Get(), upload.Get(), 0, 0, 1, &vertexData);
+
+    std::weak_ptr weak = shared_from_this();
+    auto callback = [weak]() {
+        auto shared = weak.lock();
+        if (shared)
+        {
+            shared->m_upload = UploadStates::Uploaded;
+        }
+    };
+
+    commandList->AddOnCompleted(callback);
+}
+
 std::shared_ptr<ResourceItem> ResourceItem::CreateUpload(const ComPtr<ID3D12Device> &device, UINT byteLength)
 {
     ComPtr<ID3D12Resource> resource;

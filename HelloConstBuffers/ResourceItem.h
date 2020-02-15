@@ -29,9 +29,12 @@ class ResourceItem : public std::enable_shared_from_this<ResourceItem>
     ResourceItem(const ComPtr<ID3D12Resource> &resource, D3D12_RESOURCE_STATES state);
 
 public:
+    D3D12_RESOURCE_STATES ResourceState() const { return m_state; }
+    UploadStates UploadState() const { return m_upload; }
     const ComPtr<ID3D12Resource> &Resource() const { return m_resource; }
     void MapCopyUnmap(const void *p, UINT byteLength);
     void EnqueueTransition(class CommandList *commandList, D3D12_RESOURCE_STATES state);
+    void EnqueueUpload(class CommandList *commandList, const ComPtr<ID3D12Resource> &upload, const void *p, UINT byteLength, UINT stride);
     static std::shared_ptr<ResourceItem> CreateUpload(const ComPtr<ID3D12Device> &device, UINT byteLength);
     static std::shared_ptr<ResourceItem> CreateDefault(const ComPtr<ID3D12Device> &device, UINT byteLength);
 };
