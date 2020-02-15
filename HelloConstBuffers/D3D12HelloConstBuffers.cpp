@@ -127,8 +127,7 @@ public:
     {
         m_queue->SyncFence();
         m_rt->Resize(m_queue->CommandQueue(), hwnd, width, height);
-        auto aspectRatio = m_rt->AspectRatio();
-        m_scene->UpdateProjection(aspectRatio);
+        m_scene->UpdateProjection(m_rt->AspectRatio());
     }
 
     // Render the scene.

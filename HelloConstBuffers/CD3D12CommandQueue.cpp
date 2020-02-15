@@ -28,11 +28,6 @@ void CD3D12CommandQueue::Initialize(const ComPtr<ID3D12Device> &device, D3D12_CO
     {
         ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
     }
-
-    // Wait for the command list to execute; we are reusing the same command
-    // list in our main loop but for now, we just want to wait for setup to
-    // complete before continuing.
-    // SyncFence();
 }
 
 void CD3D12CommandQueue::Execute(ID3D12CommandList *commandList)
