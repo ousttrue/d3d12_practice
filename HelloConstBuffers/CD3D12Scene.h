@@ -16,12 +16,12 @@ class CD3D12Scene
     // App resources.
     std::shared_ptr<class ResourceItem> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
-    ComPtr<ID3D12Resource> m_indexBuffer;
+    std::shared_ptr<class ResourceItem> m_indexBuffer;
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
     ComPtr<ID3D12Resource> m_constantBuffer;
 
     // keep
-    ComPtr<ID3D12Resource> m_upload;
+    std::shared_ptr<class ResourceItem> m_upload;
 
     float m_near = 0.1f;
     float m_far = 10.0f;
