@@ -47,7 +47,7 @@ void Camera::OnFrame(const ScreenState &state, const ScreenState &prev)
     {
         // Middle drag
         changed = true;
-        const auto f = m_translation.z * tan(m_fovY / 2) / (state.Height / 2);
+        const auto f = m_translation.z * (float)tan(m_fovY / 2) / state.Height * 2;
 
         m_translation.x += dx * f;
         m_translation.y -= dy * f;
