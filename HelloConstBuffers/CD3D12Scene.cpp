@@ -3,6 +3,7 @@
 #include "d3dhelper.h"
 #include "ResourceItem.h"
 #include "CommandList.h"
+#include "Mesh.h"
 #include <string>
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -186,24 +187,8 @@ CommandList *CD3D12Scene::PopulateCommandList(CD3D12SwapChain *rt)
     const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
     rt->Begin(commandList, clearColor);
 
-    if (m_vertexBuffer)
-    {
-        auto state = m_vertexBuffer->ResourceState();
-        if (state == D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER || state == D3D12_RESOURCE_STATE_GENERIC_READ)
-        {
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            // Initialize the vertex buffer view.
-            commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
-            commandList->DrawInstanced(3, 1, 0, 0);
-        }
-        else if (state == D3D12_RESOURCE_STATE_COPY_DEST)
-        {
-            if (m_vertexBuffer->UploadState() == UploadStates::Uploaded)
-            {
-                m_vertexBuffer->EnqueueTransition(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-            }
-        }
-    }
+    // draw or state barrier
+    m_mesh->Command(m_commandList);
 
     // Indicate that the back buffer will now be used to present.
     rt->End(commandList);

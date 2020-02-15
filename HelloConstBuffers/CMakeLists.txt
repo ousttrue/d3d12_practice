@@ -8,6 +8,7 @@ add_executable(${TARGET_NAME} WIN32
     ResourceItem.cpp
     CommandList.cpp
     Uploader.cpp
+    Mesh.cpp
     )
 target_compile_definitions(${TARGET_NAME} PRIVATE
     UNICODE

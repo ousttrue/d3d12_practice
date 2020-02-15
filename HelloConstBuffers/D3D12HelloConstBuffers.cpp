@@ -11,6 +11,7 @@
 #include "Uploader.h"
 #include "ResourceItem.h"
 #include "CD3D12CommandQueue.h"
+#include "Mesh.h"
 #include <list>
 #include <functional>
 
@@ -90,18 +91,21 @@ public:
         m_uploader->Initialize(m_device);
 
         // Create the vertex buffer.
+        auto mesh = std::make_shared<Mesh>();
+        m_scene->Mesh(mesh);
+
         auto isDynamic = false;
         if (isDynamic)
         {
             {
                 auto vertexBuffer = ResourceItem::CreateUpload(m_device, VERTICES_BYTE_SIZE);
                 vertexBuffer->MapCopyUnmap(VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
-                m_scene->VertexBuffer(vertexBuffer);
+                mesh->VertexBuffer(vertexBuffer);
             }
             {
                 auto indexBuffer = ResourceItem::CreateUpload(m_device, INDICES_BYTE_SIZE);
                 indexBuffer->MapCopyUnmap(INDICES, INDICES_BYTE_SIZE, INDEX_STRIDE);
-                m_scene->IndexBuffer(indexBuffer);
+                mesh->IndexBuffer(indexBuffer);
             }
         }
         else
@@ -109,12 +113,12 @@ public:
             {
                 auto vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
                 m_uploader->EnqueueUpload({vertexBuffer, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
-                m_scene->VertexBuffer(vertexBuffer);
+                mesh->VertexBuffer(vertexBuffer);
             }
             {
                 auto indexBuffer = ResourceItem::CreateDefault(m_device, INDICES_BYTE_SIZE);
                 m_uploader->EnqueueUpload({indexBuffer, INDICES, INDICES_BYTE_SIZE, INDEX_STRIDE});
-                m_scene->IndexBuffer(indexBuffer);
+                mesh->IndexBuffer(indexBuffer);
             }
         }
     }

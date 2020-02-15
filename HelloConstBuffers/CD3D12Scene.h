@@ -13,10 +13,7 @@ class CD3D12Scene
     ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     class CommandList *m_commandList = nullptr;
-    // App resources.
-    std::shared_ptr<class ResourceItem> m_vertexBuffer;
-    // D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
-    std::shared_ptr<class ResourceItem> m_indexBuffer;
+    std::shared_ptr<class Mesh> m_mesh;
     // D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
     ComPtr<ID3D12Resource> m_constantBuffer;
 
@@ -37,8 +34,7 @@ class CD3D12Scene
 public:
     CD3D12Scene();
     ~CD3D12Scene();
-    void VertexBuffer(const std::shared_ptr<ResourceItem> &item) { m_vertexBuffer = item; }
-    void IndexBuffer(const std::shared_ptr<ResourceItem> &item) { m_indexBuffer = item; }
+    void Mesh(const std::shared_ptr<Mesh> &mesh) { m_mesh = mesh; }
     bool Initialize(const ComPtr<ID3D12Device> &device);
     class CommandList *Update(class CD3D12SwapChain *rt)
     {
