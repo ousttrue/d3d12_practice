@@ -12,6 +12,7 @@
 #include "ResourceItem.h"
 #include "CD3D12CommandQueue.h"
 #include "Mesh.h"
+#include "ScreenState.h"
 #include <list>
 #include <functional>
 
@@ -33,6 +34,7 @@ UINT INDICES[] =
         0, 1, 2};
 const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
 const UINT INDEX_STRIDE = sizeof(INDICES[0]);
+
 
 class Impl
 {
@@ -123,6 +125,17 @@ public:
         }
     }
 
+    ScreenState m_lastState = {};
+    void OnFrame(HWND hWnd, const ScreenState &state)
+    {
+        if (m_lastState.Width != state.Width || m_lastState.Height != state.Height)
+        {
+            OnSize(hWnd, state.Width, state.Height);
+        }
+        m_lastState = state;
+        OnRender();
+    }
+
     void OnSize(HWND hwnd, UINT width, UINT height)
     {
         m_queue->SyncFence();
@@ -165,10 +178,5 @@ void D3D12HelloConstBuffers::OnFrame(void *hwnd, const struct ScreenState &state
         m_impl = new Impl();
         m_impl->OnInit((HWND)hwnd, m_useWarpDevice);
     }
-    if (m_lastState.Width != state.Width || m_lastState.Height != state.Height)
-    {
-        m_impl->OnSize((HWND)hwnd, state.Width, state.Height);
-    }
-    m_lastState = state;
-    m_impl->OnRender();
+    m_impl->OnFrame((HWND)hwnd, state);
 }
