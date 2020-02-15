@@ -67,8 +67,7 @@ UINT64 CD3D12CommandQueue::FenceValue() const
 UINT64 CD3D12CommandQueue::Signal()
 {
     // Signal and increment the fence value.
-    const UINT64 fence = m_nextFenceValue;
+    const UINT64 fence = m_nextFenceValue++;
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
-    m_nextFenceValue++;
     return fence;
 }
