@@ -22,11 +22,16 @@ class CD3D12Scene
     float m_x = 0;
     struct SceneConstantBuffer
     {
-        DirectX::XMFLOAT4X4 world;
         DirectX::XMFLOAT4X4 view;
         DirectX::XMFLOAT4X4 projection;
     };
-    CD3D12ConstantBuffer<SceneConstantBuffer> m_constantBuffer;
+    CD3D12ConstantBuffer<SceneConstantBuffer> m_sceneConstant;
+    float m_y = 0;
+    struct ModelConstantBuffer
+    {
+        DirectX::XMFLOAT4X4 world;
+    };
+    CD3D12ConstantBuffer<ModelConstantBuffer> m_modelConstant;
 
 public:
     CD3D12Scene();

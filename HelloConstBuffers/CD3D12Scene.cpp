@@ -34,7 +34,7 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
         // Flags indicate that this descriptor heap can be bound to the pipeline
         // and that descriptors contained in it can be referenced by a root table.
         D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-        cbvHeapDesc.NumDescriptors = 1;
+        cbvHeapDesc.NumDescriptors = 2;
         cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
@@ -55,7 +55,7 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
         CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
         CD3DX12_ROOT_PARAMETER1 rootParameters[1];
 
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 2, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
         rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
 
         // Allow input layout and deny uneccessary access to certain pipeline stages.
@@ -116,7 +116,8 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     }
 
     // Create the constant buffer.
-    m_constantBuffer.Initialize(device, m_cbvHeap, 0);
+    m_sceneConstant.Initialize(device, m_cbvHeap, 0);
+    m_modelConstant.Initialize(device, m_cbvHeap, 1);
 
     return true;
 }
@@ -126,14 +127,15 @@ void CD3D12Scene::UpdateProjection(float aspectRatio)
     // projection
     {
         auto m = XMMatrixPerspectiveFovLH(m_fovY, aspectRatio, m_near, m_far);
-        XMStoreFloat4x4(&m_constantBuffer.Data.projection, m);
+        XMStoreFloat4x4(&m_sceneConstant.Data.projection, m);
     }
 
     // view
     {
         auto m = XMMatrixTranslation(0, 0, 1);
-        XMStoreFloat4x4(&m_constantBuffer.Data.view, m);
+        XMStoreFloat4x4(&m_sceneConstant.Data.view, m);
     }
+    m_sceneConstant.CopyToGpu();
 }
 
 // Update frame-based values.
@@ -143,9 +145,8 @@ void CD3D12Scene::OnUpdate()
     const float translationSpeed = 1.0f / 180.0f * DirectX::XM_PI;
     m_x += translationSpeed;
     auto m = XMMatrixRotationY(m_x);
-    XMStoreFloat4x4(&m_constantBuffer.Data.world, m);
-
-    m_constantBuffer.CopyToGpu();
+    XMStoreFloat4x4(&m_modelConstant.Data.world, m);
+    m_modelConstant.CopyToGpu();
 }
 
 // Fill the command list with all the render commands and dependent state.
