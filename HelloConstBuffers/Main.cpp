@@ -1,4 +1,5 @@
 #include "D3D12HelloConstBuffers.h"
+#include "WindowMouseState.h"
 
 int WIDTH = 1280;
 int HEIGHT = 720;
@@ -87,6 +88,77 @@ struct CommandLine
     }
 };
 
+class Window
+{
+    HWND m_hwnd = NULL;
+
+public:
+    HWND Create(const wchar_t *className, const wchar_t *titleName,
+                int width, int height, WNDPROC wndProc, void *p)
+    {
+        auto hInstance = GetModuleHandle(NULL);
+        // Initialize the window class.
+        WNDCLASSEX windowClass = {0};
+        windowClass.cbSize = sizeof(WNDCLASSEX);
+        windowClass.style = CS_HREDRAW | CS_VREDRAW;
+        windowClass.lpfnWndProc = wndProc;
+        windowClass.hInstance = hInstance;
+        windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+        windowClass.lpszClassName = className;
+        if (!RegisterClassEx(&windowClass))
+        {
+            return NULL;
+        }
+
+        RECT windowRect = {0, 0, width, height};
+        AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+        // Create the window and store a handle to it.
+        m_hwnd = CreateWindow(
+            className,
+            titleName,
+            WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            windowRect.right - windowRect.left,
+            windowRect.bottom - windowRect.top,
+            nullptr, // We have no parent window.
+            nullptr, // We aren't using menus.
+            hInstance,
+            p);
+
+        return m_hwnd;
+    }
+
+    void Show(int nCmdShow = SW_SHOW)
+    {
+        ShowWindow(m_hwnd, nCmdShow);
+    }
+
+    bool Loop(int *pOut)
+    {
+        while (true)
+        {
+            MSG msg = {};
+            if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+            else
+            {
+                return true;
+            }
+
+            if (msg.message == WM_QUIT)
+            {
+                *pOut = (int)msg.wParam;
+                return false;
+            }
+        }
+    }
+};
+
 _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
     CommandLine cmd;
@@ -94,50 +166,25 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
 
     D3D12HelloConstBuffers sample;
 
-    // Initialize the window class.
-    WNDCLASSEX windowClass = {0};
-    windowClass.cbSize = sizeof(WNDCLASSEX);
-    windowClass.style = CS_HREDRAW | CS_VREDRAW;
-    windowClass.lpfnWndProc = WindowProc;
-    windowClass.hInstance = hInstance;
-    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    windowClass.lpszClassName = CLASS_NAME.c_str();
-    RegisterClassEx(&windowClass);
-
-    RECT windowRect = {0, 0, WIDTH, HEIGHT};
-    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
-
-    // Create the window and store a handle to it.
-    auto hwnd = CreateWindow(
-        windowClass.lpszClassName,
-        WINDOW_TITLE.c_str(),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        windowRect.right - windowRect.left,
-        windowRect.bottom - windowRect.top,
-        nullptr, // We have no parent window.
-        nullptr, // We aren't using menus.
-        hInstance,
-        &sample);
+    Window window;
+    auto hwnd = window.Create(CLASS_NAME.c_str(), WINDOW_TITLE.c_str(),
+                              WIDTH, HEIGHT, WindowProc, &sample);
+    if (!hwnd)
+    {
+        return 1;
+    }
 
     // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
     sample.OnInit(hwnd, cmd.m_useWarpDevice);
 
-    ShowWindow(hwnd, nCmdShow);
+    window.Show();
 
     // Main sample loop.
-    MSG msg = {};
-    while (msg.message != WM_QUIT)
+    int retcode;
+    while (window.Loop(&retcode))
     {
-        // Process any messages in the queue.
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
     }
 
     // Return this part of the WM_QUIT message to Windows.
-    return static_cast<char>(msg.wParam);
+    return retcode;
 }
