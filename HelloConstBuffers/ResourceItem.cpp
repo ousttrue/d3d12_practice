@@ -6,8 +6,9 @@
 ResourceItem::ResourceItem(
     const ComPtr<ID3D12Resource> &resource,
     D3D12_RESOURCE_STATES state)
-    : m_resource(resource), m_state(state)
+    : m_resource(resource)
 {
+    m_state.State = state;
 }
 
 void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength, UINT stride)
@@ -21,7 +22,7 @@ void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength, UINT stride)
 
     m_byteLength = byteLength;
     m_stride = stride;
-    m_upload = UploadStates::Uploaded;
+    m_state.Upload = UploadStates::Uploaded;
 }
 
 void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_STATES state)
@@ -30,7 +31,7 @@ void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_ST
         1,
         &CD3DX12_RESOURCE_BARRIER::Transition(
             m_resource.Get(),
-            m_state,
+            m_state.State,
             state));
 
     std::weak_ptr weak = shared_from_this();
@@ -38,7 +39,7 @@ void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_ST
         auto shared = weak.lock();
         if (shared)
         {
-            shared->m_state = state;
+            shared->m_state.State = state;
         }
     };
 
@@ -63,7 +64,7 @@ void ResourceItem::EnqueueUpload(CommandList *commandList,
         auto shared = weak.lock();
         if (shared)
         {
-            shared->m_upload = UploadStates::Uploaded;
+            shared->m_state.Upload = UploadStates::Uploaded;
         }
     };
 

@@ -2,25 +2,52 @@
 #include "ResourceItem.h"
 #include "CommandList.h"
 
-void Mesh::Command(CommandList *commandList)
+void Mesh::IndexedCommand(CommandList *commandList)
 {
-    auto _commandList = commandList->Get();
-    if (m_vertexBuffer)
+    auto indexState = m_indexBuffer->State();
+    if (indexState.State == D3D12_RESOURCE_STATE_COPY_DEST)
     {
-        auto state = m_vertexBuffer->ResourceState();
-        if (state == D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER || state == D3D12_RESOURCE_STATE_GENERIC_READ)
+        if (indexState.Upload == UploadStates::Uploaded)
         {
-            _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            // Initialize the vertex buffer view.
-            _commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
-            _commandList->DrawInstanced(3, 1, 0, 0);
+            m_indexBuffer->EnqueueTransition(commandList, D3D12_RESOURCE_STATE_INDEX_BUFFER);
         }
-        else if (state == D3D12_RESOURCE_STATE_COPY_DEST)
+    }
+
+    auto vertexState = m_vertexBuffer->State();
+    if (vertexState.State == D3D12_RESOURCE_STATE_COPY_DEST)
+    {
+        if (vertexState.Upload == UploadStates::Uploaded)
         {
-            if (m_vertexBuffer->UploadState() == UploadStates::Uploaded)
-            {
-                m_vertexBuffer->EnqueueTransition(commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-            }
+            m_vertexBuffer->EnqueueTransition(commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
         }
+    }
+
+    if(vertexState.Drawable() && indexState.Drawable())
+    {
+        auto _commandList = commandList->Get();
+        _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        _commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
+        _commandList->IASetIndexBuffer(&m_indexBuffer->IndexBufferView());
+        _commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+    }
+}
+
+void Mesh::NonIndexedCommand(CommandList *commandList)
+{
+    auto state = m_vertexBuffer->State();
+    if (state.State == D3D12_RESOURCE_STATE_COPY_DEST)
+    {
+        if (state.Upload == UploadStates::Uploaded)
+        {
+            m_vertexBuffer->EnqueueTransition(commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        }
+    }
+
+    if (state.Drawable())
+    {
+        auto _commandList = commandList->Get();
+        _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        _commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
+        _commandList->DrawInstanced(3, 1, 0, 0);
     }
 }
