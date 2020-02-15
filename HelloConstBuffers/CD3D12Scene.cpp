@@ -116,27 +116,7 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     }
 
     // Create the constant buffer.
-    {
-        ThrowIfFailed(device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_constantBuffer)));
-
-        // Describe and create a constant buffer view.
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-        cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
-        cbvDesc.SizeInBytes = (sizeof(SceneConstantBuffer) + 255) & ~255; // CB size is required to be 256-byte aligned.
-        device->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
-
-        // Map and initialize the constant buffer. We don't unmap this until the
-        // app closes. Keeping things mapped for the lifetime of the resource is okay.
-        CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU.
-        ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void **>(&m_pCbvDataBegin)));
-        memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-    }
+    m_constantBuffer.Initialize(device, m_cbvHeap);
 
     return true;
 }
@@ -146,13 +126,13 @@ void CD3D12Scene::UpdateProjection(float aspectRatio)
     // projection
     {
         auto m = XMMatrixPerspectiveFovLH(m_fovY, aspectRatio, m_near, m_far);
-        XMStoreFloat4x4(&m_constantBufferData.projection, m);
+        XMStoreFloat4x4(&m_constantBuffer.Data.projection, m);
     }
 
     // view
     {
         auto m = XMMatrixTranslation(0, 0, 1);
-        XMStoreFloat4x4(&m_constantBufferData.view, m);
+        XMStoreFloat4x4(&m_constantBuffer.Data.view, m);
     }
 }
 
@@ -163,9 +143,9 @@ void CD3D12Scene::OnUpdate()
     const float translationSpeed = 1.0f / 180.0f * DirectX::XM_PI;
     m_x += translationSpeed;
     auto m = XMMatrixRotationY(m_x);
-    XMStoreFloat4x4(&m_constantBufferData.world, m);
+    XMStoreFloat4x4(&m_constantBuffer.Data.world, m);
 
-    memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+    m_constantBuffer.CopyToGpu();
 }
 
 // Fill the command list with all the render commands and dependent state.

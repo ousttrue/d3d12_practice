@@ -3,6 +3,7 @@
 #include <wrl/client.h>
 #include <DirectXMath.h>
 #include <memory>
+#include "CD3D12ConstantBuffer.h"
 
 class CD3D12Scene
 {
@@ -14,13 +15,10 @@ class CD3D12Scene
     ComPtr<ID3D12PipelineState> m_pipelineState;
     class CommandList *m_commandList = nullptr;
     std::shared_ptr<class Mesh> m_mesh;
-    // D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
-    ComPtr<ID3D12Resource> m_constantBuffer;
 
     float m_near = 0.1f;
     float m_far = 10.0f;
     float m_fovY = 30.0f / 180.0f * DirectX::XM_PI;
-
     float m_x = 0;
     struct SceneConstantBuffer
     {
@@ -28,8 +26,7 @@ class CD3D12Scene
         DirectX::XMFLOAT4X4 view;
         DirectX::XMFLOAT4X4 projection;
     };
-    SceneConstantBuffer m_constantBufferData{};
-    UINT8 *m_pCbvDataBegin = nullptr;
+    CD3D12ConstantBuffer<SceneConstantBuffer> m_constantBuffer;
 
 public:
     CD3D12Scene();
