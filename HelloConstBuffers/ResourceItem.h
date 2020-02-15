@@ -4,6 +4,13 @@
 #include <wrl/client.h>
 #include <memory>
 
+enum UploadStates
+{
+    None,
+    Enqueued,
+    Uploaded,
+};
+
 /// ID3D12Resource helper
 ///
 /// * State maintenance
@@ -16,7 +23,8 @@ class ResourceItem : public std::enable_shared_from_this<ResourceItem>
 
     ComPtr<ID3D12Resource> m_resource;
 
-    volatile D3D12_RESOURCE_STATES m_state = {};
+    D3D12_RESOURCE_STATES m_state = {};
+    UploadStates m_upload = UploadStates::None;
 
     ResourceItem(const ComPtr<ID3D12Resource> &resource, D3D12_RESOURCE_STATES state);
 

@@ -3,7 +3,9 @@
 #include "d3dhelper.h"
 #include "CommandList.h"
 
-ResourceItem::ResourceItem(const ComPtr<ID3D12Resource> &resource, D3D12_RESOURCE_STATES state)
+ResourceItem::ResourceItem(
+    const ComPtr<ID3D12Resource> &resource,
+    D3D12_RESOURCE_STATES state)
     : m_resource(resource), m_state(state)
 {
 }
@@ -16,6 +18,8 @@ void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength)
     ThrowIfFailed(m_resource->Map(0, &readRange, reinterpret_cast<void **>(&begin)));
     memcpy(begin, p, byteLength);
     m_resource->Unmap(0, nullptr);
+
+    m_upload = UploadStates::Uploaded;
 }
 
 void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_STATES state)
