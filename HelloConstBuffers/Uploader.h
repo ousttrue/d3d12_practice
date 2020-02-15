@@ -18,24 +18,24 @@ class Uploader
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
-    ComPtr<ID3D12CommandAllocator> m_commandAllocator;
-    ComPtr<ID3D12GraphicsCommandList> m_commandList;
+    class CD3D12CommandQueue *m_queue = nullptr;
+    class CommandList *m_commandList = nullptr;
 
-    // Synchronization objects.
-    HANDLE m_fenceEvent;
-    ComPtr<ID3D12Fence> m_fence;
-    UINT64 m_fenceValue;
-
-    std::queue<UploadCommand> m_queue;
+    std::queue<UploadCommand> m_commands;
     using OnCompletedFunc = std::function<void()>;
     OnCompletedFunc m_callback;
+    UINT64 m_callbackFenceValue = 0;
+
+    // for upload staging
+    ComPtr<ID3D12Resource> m_upload;
 
 public:
+    Uploader();
+    ~Uploader();
     void Initialize(const ComPtr<ID3D12Device> &device);
-    void Update();
+    void Update(const ComPtr<ID3D12Device> &device);
     void EnqueueUpload(const UploadCommand &command)
     {
-        m_queue.push(command);
+        m_commands.push(command);
     }
 };

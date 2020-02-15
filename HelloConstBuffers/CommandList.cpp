@@ -1,12 +1,12 @@
 #include "CommandList.h"
 #include "d3dhelper.h"
 
-void CommandList::Initialize(const ComPtr<ID3D12Device> &device, const ComPtr<ID3D12PipelineState> &ps)
+void CommandList::Initialize(const ComPtr<ID3D12Device> &device, const ComPtr<ID3D12PipelineState> &ps, D3D12_COMMAND_LIST_TYPE type)
 {
-    ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+    ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(&m_commandAllocator)));
 
     // Create the command list.
-    ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), ps.Get(), IID_PPV_ARGS(&m_commandList)));
+    ThrowIfFailed(device->CreateCommandList(0, type, m_commandAllocator.Get(), ps.Get(), IID_PPV_ARGS(&m_commandList)));
 
     // Command lists are created in the recording state, but there is nothing
     // to record yet. The main loop expects it to be closed, so close it now.

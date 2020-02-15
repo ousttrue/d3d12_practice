@@ -11,17 +11,16 @@ CD3D12CommandQueue::~CD3D12CommandQueue()
 }
 
 // Create synchronization objects and wait until assets have been uploaded to the GPU.
-void CD3D12CommandQueue::Initialize(const ComPtr<ID3D12Device> &device)
+void CD3D12CommandQueue::Initialize(const ComPtr<ID3D12Device> &device, D3D12_COMMAND_LIST_TYPE type)
 {
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {
-        .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
-        // .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+        .Type = type,
     };
     ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
     ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-    m_fenceValue = 1;
+    m_nextFenceValue = 1;
 
     // Create an event handle to use for frame synchronization.
     m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -45,18 +44,10 @@ void CD3D12CommandQueue::Execute(ID3D12CommandList *commandList)
 
 void CD3D12CommandQueue::SyncFence(const CallbackList &callbacks)
 {
-    // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-    // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-    // sample illustrates how to use fences for efficient resource usage and to
-    // maximize GPU utilization.
-
-    // Signal and increment the fence value.
-    const UINT64 fence = m_fenceValue;
-    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
-    m_fenceValue++;
+    auto fence = Signal();
 
     // Wait until the previous frame is finished.
-    if (m_fence->GetCompletedValue() < fence)
+    if (FenceValue() < fence)
     {
         ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
         WaitForSingleObject(m_fenceEvent, INFINITE);
@@ -66,4 +57,18 @@ void CD3D12CommandQueue::SyncFence(const CallbackList &callbacks)
     {
         callback();
     }
+}
+
+UINT64 CD3D12CommandQueue::FenceValue() const
+{
+    return m_fence->GetCompletedValue();
+}
+
+UINT64 CD3D12CommandQueue::Signal()
+{
+    // Signal and increment the fence value.
+    const UINT64 fence = m_nextFenceValue;
+    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
+    m_nextFenceValue++;
+    return fence;
 }

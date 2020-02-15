@@ -54,10 +54,11 @@ public:
 
     ~Impl()
     {
-        delete m_queue;
+        m_queue->SyncFence();
         delete m_uploader;
         delete m_scene;
         delete m_rt;
+        delete m_queue;
     }
 
     void OnInit(HWND hwnd, bool useWarpDevice)
@@ -99,7 +100,7 @@ public:
         else
         {
             auto vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
-            m_uploader->EnqueueUpload({m_scene->VertexBuffer(), VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
+            m_uploader->EnqueueUpload({vertexBuffer, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
             m_scene->VertexBuffer(vertexBuffer);
         }
     }
@@ -115,7 +116,7 @@ public:
     // Render the scene.
     void OnRender()
     {
-        m_uploader->Update();
+        m_uploader->Update(m_device);
 
         m_rt->Prepare(m_device);
         auto commandList = m_scene->Update(m_rt);

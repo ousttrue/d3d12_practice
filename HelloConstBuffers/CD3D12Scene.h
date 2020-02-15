@@ -20,9 +20,6 @@ class CD3D12Scene
     // D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
     ComPtr<ID3D12Resource> m_constantBuffer;
 
-    // keep
-    std::shared_ptr<class ResourceItem> m_upload;
-
     float m_near = 0.1f;
     float m_far = 10.0f;
     float m_fovY = 30.0f / 180.0f * DirectX::XM_PI;
