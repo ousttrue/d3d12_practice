@@ -16,17 +16,7 @@ class CD3D12Scene
     class CommandList *m_commandList = nullptr;
     std::shared_ptr<class Mesh> m_mesh;
 
-    float m_near = 0.1f;
-    float m_far = 10.0f;
-    float m_fovY = 30.0f / 180.0f * DirectX::XM_PI;
     float m_x = 0;
-    struct SceneConstantBuffer
-    {
-        DirectX::XMFLOAT4X4 view;
-        DirectX::XMFLOAT4X4 projection;
-    };
-    CD3D12ConstantBuffer<SceneConstantBuffer> m_sceneConstant;
-    float m_y = 0;
     struct ModelConstantBuffer
     {
         DirectX::XMFLOAT4X4 world;
@@ -36,6 +26,7 @@ class CD3D12Scene
 public:
     CD3D12Scene();
     ~CD3D12Scene();
+    const ComPtr<ID3D12DescriptorHeap> &Heap() const { return m_cbvHeap; }
     void Mesh(const std::shared_ptr<Mesh> &mesh) { m_mesh = mesh; }
     bool Initialize(const ComPtr<ID3D12Device> &device);
     class CommandList *Update(class CD3D12SwapChain *rt)
@@ -45,7 +36,6 @@ public:
         // Record all the commands we need to render the scene into the command list.
         return PopulateCommandList(rt);
     }
-    void UpdateProjection(float aspectRatio);
 
 private:
     void OnUpdate();

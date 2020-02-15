@@ -13,6 +13,7 @@
 #include "CD3D12CommandQueue.h"
 #include "Mesh.h"
 #include "ScreenState.h"
+#include "Camera.h"
 #include <list>
 #include <functional>
 
@@ -36,6 +37,7 @@ const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
 const UINT INDEX_STRIDE = sizeof(INDICES[0]);
 
 
+
 class Impl
 {
     // Pipeline objects.
@@ -45,19 +47,22 @@ class Impl
     CD3D12Scene *m_scene = nullptr;
     Uploader *m_uploader = nullptr;
     CD3D12CommandQueue *m_queue = nullptr;
+    Camera *m_camera = nullptr;
 
 public:
     Impl()
         : m_rt(new CD3D12SwapChain),
           m_scene(new CD3D12Scene),
           m_uploader(new Uploader),
-          m_queue(new CD3D12CommandQueue)
+          m_queue(new CD3D12CommandQueue),
+          m_camera(new Camera)
     {
     }
 
     ~Impl()
     {
         m_queue->SyncFence();
+        delete m_camera;
         delete m_uploader;
         delete m_scene;
         delete m_rt;
@@ -90,6 +95,7 @@ public:
         m_queue->Initialize(m_device);
         m_rt->Initialize(factory, m_queue->CommandQueue(), hwnd);
         m_scene->Initialize(m_device);
+        m_camera->Initialize(m_device, m_scene->Heap());
         m_uploader->Initialize(m_device);
 
         // Create the vertex buffer.
@@ -140,7 +146,7 @@ public:
     {
         m_queue->SyncFence();
         m_rt->Resize(m_queue->CommandQueue(), hwnd, width, height);
-        m_scene->UpdateProjection(m_rt->AspectRatio());
+        m_camera->UpdateProjection(m_rt->AspectRatio());
     }
 
     // Render the scene.

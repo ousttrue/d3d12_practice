@@ -116,34 +116,18 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     }
 
     // Create the constant buffer.
-    m_sceneConstant.Initialize(device, m_cbvHeap, 0);
     m_modelConstant.Initialize(device, m_cbvHeap, 1);
 
     return true;
 }
 
-void CD3D12Scene::UpdateProjection(float aspectRatio)
-{
-    // projection
-    {
-        auto m = XMMatrixPerspectiveFovLH(m_fovY, aspectRatio, m_near, m_far);
-        XMStoreFloat4x4(&m_sceneConstant.Data.projection, m);
-    }
-
-    // view
-    {
-        auto m = XMMatrixTranslation(0, 0, 1);
-        XMStoreFloat4x4(&m_sceneConstant.Data.view, m);
-    }
-    m_sceneConstant.CopyToGpu();
-}
+const float translationSpeed = 1.0f / 180.0f * DirectX::XM_PI;
 
 // Update frame-based values.
 void CD3D12Scene::OnUpdate()
 {
     // update world
-    const float translationSpeed = 1.0f / 180.0f * DirectX::XM_PI;
-    m_x += translationSpeed;
+    // m_x += translationSpeed;
     auto m = XMMatrixRotationY(m_x);
     XMStoreFloat4x4(&m_modelConstant.Data.world, m);
     m_modelConstant.CopyToGpu();

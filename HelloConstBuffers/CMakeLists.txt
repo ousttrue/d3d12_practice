@@ -9,6 +9,7 @@ add_executable(${TARGET_NAME} WIN32
     CommandList.cpp
     Uploader.cpp
     Mesh.cpp
+    Camera.cpp
     )
 target_compile_definitions(${TARGET_NAME} PRIVATE
     UNICODE
