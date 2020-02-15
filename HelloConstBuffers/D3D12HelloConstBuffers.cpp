@@ -26,12 +26,12 @@ Vertex VERTICES[] =
         {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
         {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
 const UINT VERTICES_BYTE_SIZE = sizeof(VERTICES);
-const UINT VERTEX_STRIDE = sizeof(Vertex);
+const UINT VERTEX_STRIDE = sizeof(VERTICES[0]);
 UINT INDICES[] =
     {
         0, 1, 2};
 const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
-const auto INDEX_FORMAT = DXGI_FORMAT_R16_UINT;
+const UINT INDEX_STRIDE = sizeof(INDICES[0]);
 
 class Impl
 {
@@ -93,15 +93,29 @@ public:
         auto isDynamic = false;
         if (isDynamic)
         {
-            auto vertexBuffer = ResourceItem::CreateUpload(m_device, VERTICES_BYTE_SIZE);
-            vertexBuffer->MapCopyUnmap(VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
-            m_scene->VertexBuffer(vertexBuffer);
+            {
+                auto vertexBuffer = ResourceItem::CreateUpload(m_device, VERTICES_BYTE_SIZE);
+                vertexBuffer->MapCopyUnmap(VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
+                m_scene->VertexBuffer(vertexBuffer);
+            }
+            {
+                auto indexBuffer = ResourceItem::CreateUpload(m_device, INDICES_BYTE_SIZE);
+                indexBuffer->MapCopyUnmap(INDICES, INDICES_BYTE_SIZE, INDEX_STRIDE);
+                m_scene->IndexBuffer(indexBuffer);
+            }
         }
         else
         {
-            auto vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
-            m_uploader->EnqueueUpload({vertexBuffer, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
-            m_scene->VertexBuffer(vertexBuffer);
+            {
+                auto vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
+                m_uploader->EnqueueUpload({vertexBuffer, VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
+                m_scene->VertexBuffer(vertexBuffer);
+            }
+            {
+                auto indexBuffer = ResourceItem::CreateDefault(m_device, INDICES_BYTE_SIZE);
+                m_uploader->EnqueueUpload({indexBuffer, INDICES, INDICES_BYTE_SIZE, INDEX_STRIDE});
+                m_scene->IndexBuffer(indexBuffer);
+            }
         }
     }
 

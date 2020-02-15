@@ -37,8 +37,8 @@ class CD3D12Scene
 public:
     CD3D12Scene();
     ~CD3D12Scene();
-    const std::shared_ptr<class ResourceItem> &VertexBuffer() const { return m_vertexBuffer; }
     void VertexBuffer(const std::shared_ptr<ResourceItem> &item) { m_vertexBuffer = item; }
+    void IndexBuffer(const std::shared_ptr<ResourceItem> &item) { m_indexBuffer = item; }
     bool Initialize(const ComPtr<ID3D12Device> &device);
     class CommandList *Update(class CD3D12SwapChain *rt)
     {
