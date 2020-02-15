@@ -15,9 +15,9 @@ class CD3D12Scene
     class CommandList *m_commandList = nullptr;
     // App resources.
     std::shared_ptr<class ResourceItem> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
+    // D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
     std::shared_ptr<class ResourceItem> m_indexBuffer;
-    D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
+    // D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
     ComPtr<ID3D12Resource> m_constantBuffer;
 
     // keep
@@ -40,6 +40,8 @@ class CD3D12Scene
 public:
     CD3D12Scene();
     ~CD3D12Scene();
+    const std::shared_ptr<class ResourceItem> &VertexBuffer() const { return m_vertexBuffer; }
+    void VertexBuffer(const std::shared_ptr<ResourceItem> &item) { m_vertexBuffer = item; }
     bool Initialize(const ComPtr<ID3D12Device> &device);
     class CommandList *Update(class CD3D12SwapChain *rt)
     {
@@ -49,10 +51,6 @@ public:
         return PopulateCommandList(rt);
     }
     void UpdateProjection(float aspectRatio);
-    class CommandList *SetVertices(const ComPtr<ID3D12Device> &device,
-                                   const void *vertices, UINT vertexBytes, UINT vertexStride,
-                                   const void *indices, UINT indexBytes, DXGI_FORMAT indexStride,
-                                   bool isDynamic);
 
 private:
     void OnUpdate();

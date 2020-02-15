@@ -8,6 +8,8 @@
 #include "CD3D12SwapChain.h"
 #include "CD3D12Scene.h"
 #include "CommandList.h"
+#include "Uploader.h"
+#include "ResourceItem.h"
 #include <list>
 #include <functional>
 
@@ -42,10 +44,11 @@ class Impl
 
     CD3D12SwapChain *m_rt = nullptr;
     CD3D12Scene *m_scene = nullptr;
+    Uploader *m_uploader = nullptr;
 
 public:
     Impl()
-        : m_rt(new CD3D12SwapChain), m_scene(new CD3D12Scene)
+        : m_rt(new CD3D12SwapChain), m_scene(new CD3D12Scene), m_uploader(new Uploader)
     {
     }
 
@@ -55,6 +58,7 @@ public:
         // cleaned up by the destructor.
         SyncFence();
 
+        delete m_uploader;
         delete m_scene;
         delete m_rt;
         CloseHandle(m_fenceEvent);
@@ -69,28 +73,22 @@ public:
         m_rt->Initialize(factory, m_commandQueue, hwnd);
         m_scene->Initialize(m_device);
 
-        auto commandList = m_scene->SetVertices(
-            m_device,
-            VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE,
-            INDICES, INDICES_BYTE_SIZE, INDEX_FORMAT,
-            false);
-        if (commandList)
+        // Create the vertex buffer.
+        auto upload = false;
+        std::shared_ptr<ResourceItem> vertexBuffer;
+        if (upload)
         {
-            Execute(commandList);
+            vertexBuffer = ResourceItem::CreateUpload(m_device, VERTICES_BYTE_SIZE);
+            vertexBuffer->MapCopyUnmap(VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
         }
-    }
+        else
+        {
+            vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
+        }
+        m_scene->VertexBuffer(vertexBuffer);
 
-    void Execute(CommandList *commandList, bool present = false)
-    {
-        auto callbacks = commandList->Close();
-        ID3D12CommandList *list[] = {
-            commandList->Get()};
-        m_commandQueue->ExecuteCommandLists(_countof(list), list);
-        if (present)
-        {
-            m_rt->Present();
-        }
-        SyncFence(callbacks);
+        m_uploader->Initialize(m_device);
+        m_uploader->EnqueueUpload({m_scene->VertexBuffer(), VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
     }
 
     void OnSize(HWND hwnd, UINT width, UINT height)
@@ -150,10 +148,17 @@ public:
     // Render the scene.
     void OnRender()
     {
+        m_uploader->Update();
+
         m_rt->Prepare(m_device);
         auto commandList = m_scene->Update(m_rt);
-        Execute(commandList, true);
-        SyncFence();
+
+        auto callbacks = commandList->Close();
+        ID3D12CommandList *list[] = {
+            commandList->Get()};
+        m_commandQueue->ExecuteCommandLists(_countof(list), list);
+        m_rt->Present();
+        SyncFence(callbacks);
     }
 
     using CallbackList = std::list<std::function<void()>>;
@@ -176,7 +181,7 @@ public:
             WaitForSingleObject(m_fenceEvent, INFINITE);
         }
 
-        for (auto &callback: callbacks)
+        for (auto &callback : callbacks)
         {
             callback();
         }

@@ -10,7 +10,7 @@ ResourceItem::ResourceItem(
 {
 }
 
-void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength)
+void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength, UINT stride)
 {
     // Copy the triangle data to the vertex buffer.
     UINT8 *begin;
@@ -19,6 +19,8 @@ void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength)
     memcpy(begin, p, byteLength);
     m_resource->Unmap(0, nullptr);
 
+    m_byteLength = byteLength;
+    m_stride = stride;
     m_upload = UploadStates::Uploaded;
 }
 
@@ -44,7 +46,7 @@ void ResourceItem::EnqueueTransition(CommandList *commandList, D3D12_RESOURCE_ST
 }
 
 void ResourceItem::EnqueueUpload(CommandList *commandList,
-                                 const ComPtr<ID3D12Resource> &upload, 
+                                 const ComPtr<ID3D12Resource> &upload,
                                  const void *p, UINT byteLength, UINT stride)
 {
     // Copy data to the intermediate upload heap and then schedule a copy
@@ -66,6 +68,9 @@ void ResourceItem::EnqueueUpload(CommandList *commandList,
     };
 
     commandList->AddOnCompleted(callback);
+
+    m_byteLength = byteLength;
+    m_stride = stride;
 }
 
 std::shared_ptr<ResourceItem> ResourceItem::CreateUpload(const ComPtr<ID3D12Device> &device, UINT byteLength)

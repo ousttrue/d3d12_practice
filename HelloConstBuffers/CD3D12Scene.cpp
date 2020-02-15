@@ -140,83 +140,6 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     return true;
 }
 
-CommandList *CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &device,
-                                      const void *vertices, UINT vertexBytes, UINT vertexStride,
-                                      const void *indices, UINT indexBytes, DXGI_FORMAT indexStride,
-                                      bool isDynamic)
-{
-    // Create the vertex buffer.
-    if (isDynamic)
-    {
-        m_vertexBuffer = ResourceItem::CreateUpload(device, vertexBytes);
-        if (!m_vertexBuffer)
-        {
-            throw;
-        }
-        m_vertexBuffer->MapCopyUnmap(vertices, vertexBytes);
-    }
-    else
-    {
-        m_vertexBuffer = ResourceItem::CreateDefault(device, vertexBytes);
-        if (!m_vertexBuffer)
-        {
-            throw;
-        }
-
-        // m_indexBuffer = ResourceItem::CreateDefault(device, indexBytes);
-        // if(!m_indexBuffer)
-        // {
-        //     throw;
-        // }
-
-        auto byteLength = (UINT)std::max(vertexBytes, indexBytes);
-        m_upload = ResourceItem::CreateUpload(device, byteLength);
-        if (!m_upload)
-        {
-            throw;
-        }
-
-        m_commandList->Reset(m_pipelineState);
-
-        m_vertexBuffer->EnqueueUpload(m_commandList, m_upload->Resource(), vertices, vertexBytes, vertexStride);
-        // {
-        //     D3D12_SUBRESOURCE_DATA vertexData = {
-        //         .pData = indices,
-        //         .RowPitch = indexBytes,
-        //         .SlicePitch = 2,
-        //     };
-        //     UpdateSubresources<1>(m_commandList->Get(), m_indexBuffer.Get(), m_upload.Get(), 0, 0, 1, &vertexData);
-        //     m_commandList->Get()->ResourceBarrier(
-        //         1,
-        //         &CD3DX12_RESOURCE_BARRIER::Transition(
-        //             m_indexBuffer.Get(),
-        //             D3D12_RESOURCE_STATE_COPY_DEST,
-        //             D3D12_RESOURCE_STATE_INDEX_BUFFER));
-        // }
-    }
-
-    m_vertexBufferView = D3D12_VERTEX_BUFFER_VIEW{
-        .BufferLocation = m_vertexBuffer->Resource()->GetGPUVirtualAddress(),
-        .SizeInBytes = vertexBytes,
-        .StrideInBytes = vertexStride,
-    };
-
-    // m_indexBufferView = D3D12_INDEX_BUFFER_VIEW{
-    //     .BufferLocation = m_indexBuffer->GetGPUVirtualAddress(),
-    //     .SizeInBytes = indexBytes,
-    //     .Format = indexStride,
-    // };
-
-    if (isDynamic)
-    {
-        return nullptr;
-    }
-    else
-    {
-        return m_commandList;
-    }
-}
-
 void CD3D12Scene::UpdateProjection(float aspectRatio)
 {
     // projection
@@ -263,19 +186,22 @@ CommandList *CD3D12Scene::PopulateCommandList(CD3D12SwapChain *rt)
     const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
     rt->Begin(commandList, clearColor);
 
-    auto state = m_vertexBuffer->ResourceState();
-    if (state == D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)
+    if (m_vertexBuffer)
     {
-        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        // Initialize the vertex buffer view.
-        commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-        commandList->DrawInstanced(3, 1, 0, 0);
-    }
-    else if (state == D3D12_RESOURCE_STATE_COPY_DEST)
-    {
-        if(m_vertexBuffer->UploadState()==UploadStates::Uploaded)
+        auto state = m_vertexBuffer->ResourceState();
+        if (state == D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER || state == D3D12_RESOURCE_STATE_GENERIC_READ)
         {
-            m_vertexBuffer->EnqueueTransition(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            // Initialize the vertex buffer view.
+            commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
+            commandList->DrawInstanced(3, 1, 0, 0);
+        }
+        else if (state == D3D12_RESOURCE_STATE_COPY_DEST)
+        {
+            if (m_vertexBuffer->UploadState() == UploadStates::Uploaded)
+            {
+                m_vertexBuffer->EnqueueTransition(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            }
         }
     }
 

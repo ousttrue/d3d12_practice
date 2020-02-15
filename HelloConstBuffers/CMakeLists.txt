@@ -6,6 +6,7 @@ add_executable(${TARGET_NAME} WIN32
     CD3D12SwapChain.cpp
     ResourceItem.cpp
     CommandList.cpp
+    Uploader.cpp
     )
 target_compile_definitions(${TARGET_NAME} PRIVATE
     UNICODE
