@@ -4,7 +4,7 @@
 #include <wrl/client.h>
 #include <memory>
 
-enum UploadStates
+enum class UploadStates
 {
     None,
     Enqueued,

@@ -11,7 +11,7 @@ enum MouseButtonFlags
     WheelMinus = 0x10,
 };
 
-struct WindowMouseState
+struct ScreenState
 {
     uint32_t Time;
     MouseButtonFlags MouseFlag;        
@@ -20,4 +20,4 @@ struct WindowMouseState
     int16_t X;
     int16_t Y;
 };
-static_assert(sizeof(WindowMouseState)==16, "sizeof(WindowMouseState)");
+static_assert(sizeof(ScreenState)==16, "sizeof(WindowMouseState)");

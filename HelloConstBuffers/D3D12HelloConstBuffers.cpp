@@ -145,27 +145,30 @@ public:
     }
 };
 
-D3D12HelloConstBuffers::D3D12HelloConstBuffers()
-    : m_impl(new Impl)
+D3D12HelloConstBuffers::D3D12HelloConstBuffers(bool useWarpDevice)
+    : m_useWarpDevice(useWarpDevice)
 {
 }
 
 D3D12HelloConstBuffers::~D3D12HelloConstBuffers()
 {
-    delete m_impl;
+    if (m_impl)
+    {
+        delete m_impl;
+    }
 }
 
-void D3D12HelloConstBuffers::OnSize(HWND hwnd, UINT width, UINT height)
+void D3D12HelloConstBuffers::OnFrame(void *hwnd, const struct ScreenState &state)
 {
-    m_impl->OnSize(hwnd, width, height);
-}
-
-void D3D12HelloConstBuffers::OnInit(HWND hwnd, bool useWarpDevice)
-{
-    m_impl->OnInit(hwnd, useWarpDevice);
-}
-
-void D3D12HelloConstBuffers::OnFrame()
-{
+    if (!m_impl)
+    {
+        m_impl = new Impl();
+        m_impl->OnInit((HWND)hwnd, m_useWarpDevice);
+    }
+    if (m_lastState.Width != state.Width || m_lastState.Height != state.Height)
+    {
+        m_impl->OnSize((HWND)hwnd, state.Width, state.Height);
+    }
+    m_lastState = state;
     m_impl->OnRender();
 }

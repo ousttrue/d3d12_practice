@@ -1,17 +1,16 @@
 #pragma once
 #include <string>
 #include <Windows.h>
+#include "ScreenState.h"
 
 class D3D12HelloConstBuffers
 {
+    bool m_useWarpDevice;
     class Impl *m_impl=nullptr;
+    ScreenState m_lastState={};
 
 public:
-    D3D12HelloConstBuffers();
+    D3D12HelloConstBuffers(bool useWarpDevice);
     ~D3D12HelloConstBuffers();
-    void OnInit(HWND hwnd, bool useWarpDevice);
-    void OnSize(HWND hwnd, UINT width, UINT height);
-    void OnFrame();
-    void OnKeyDown(UINT8){}
-    void OnKeyUp(UINT8){}
+    void OnFrame(void *hwnd, const struct ScreenState &state);
 };

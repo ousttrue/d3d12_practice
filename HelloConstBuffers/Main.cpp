@@ -1,62 +1,10 @@
 #include "D3D12HelloConstBuffers.h"
-#include "WindowMouseState.h"
+#include "ScreenState.h"
 
 int WIDTH = 1280;
 int HEIGHT = 720;
 std::wstring CLASS_NAME(L"DXSampleClass");
 std::wstring WINDOW_TITLE(L"D3D12 Hello Constant Buffers");
-
-// Main message handler for the sample.
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    auto pSample = reinterpret_cast<D3D12HelloConstBuffers *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-
-    switch (message)
-    {
-    case WM_CREATE:
-    {
-        // Save the DXSample* passed in to CreateWindow.
-        LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-        SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
-    }
-        return 0;
-
-    case WM_SIZE:
-        if (wParam != SIZE_MINIMIZED)
-        {
-            pSample->OnSize(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
-        }
-        break;
-
-    case WM_KEYDOWN:
-        if (pSample)
-        {
-            pSample->OnKeyDown(static_cast<UINT8>(wParam));
-        }
-        return 0;
-
-    case WM_KEYUP:
-        if (pSample)
-        {
-            pSample->OnKeyUp(static_cast<UINT8>(wParam));
-        }
-        return 0;
-
-    case WM_PAINT:
-        if (pSample)
-        {
-            pSample->OnFrame();
-        }
-        return 0;
-
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    }
-
-    // Handle any messages the switch statement didn't.
-    return DefWindowProc(hWnd, message, wParam, lParam);
-}
 
 struct CommandLine
 {
@@ -88,20 +36,37 @@ struct CommandLine
     }
 };
 
+struct Gwlp
+{
+    // last param of CreateWindow to GWLP
+    static void Set(HWND hWnd, LPARAM lParam)
+    {
+        auto pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
+        SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+    }
+
+    template <class T>
+    static T *Get(HWND hWnd)
+    {
+        return reinterpret_cast<T *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+    }
+};
+
 class Window
 {
     HWND m_hwnd = NULL;
+    ScreenState m_state;
 
 public:
     HWND Create(const wchar_t *className, const wchar_t *titleName,
-                int width, int height, WNDPROC wndProc, void *p)
+                int width, int height)
     {
         auto hInstance = GetModuleHandle(NULL);
         // Initialize the window class.
         WNDCLASSEX windowClass = {0};
         windowClass.cbSize = sizeof(WNDCLASSEX);
         windowClass.style = CS_HREDRAW | CS_VREDRAW;
-        windowClass.lpfnWndProc = wndProc;
+        windowClass.lpfnWndProc = WindowProc;
         windowClass.hInstance = hInstance;
         windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
         windowClass.lpszClassName = className;
@@ -125,7 +90,7 @@ public:
             nullptr, // We have no parent window.
             nullptr, // We aren't using menus.
             hInstance,
-            p);
+            this);
 
         return m_hwnd;
     }
@@ -135,11 +100,56 @@ public:
         ShowWindow(m_hwnd, nCmdShow);
     }
 
-    bool Loop(int *pOut)
+    static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
+        auto window = Gwlp::Get<Window>(hWnd);
+
+        switch (message)
+        {
+        case WM_CREATE:
+            Gwlp::Set(hWnd, lParam);
+            return 0;
+
+        case WM_SIZE:
+            if (wParam != SIZE_MINIMIZED)
+            {
+                window->m_state.Width = LOWORD(lParam);
+                window->m_state.Height = HIWORD(lParam);
+            }
+            break;
+
+            // TODO:
+            // case WM_KEYDOWN:
+            //     if (pSample)
+            //     {
+            //         pSample->OnKeyDown(static_cast<UINT8>(wParam));
+            //     }
+            //     return 0;
+
+            // case WM_KEYUP:
+            //     if (pSample)
+            //     {
+            //         pSample->OnKeyUp(static_cast<UINT8>(wParam));
+            //     }
+            //     return 0;
+
+        case WM_ERASEBKGND:
+            return 1;
+
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+        }
+
+        // Handle any messages the switch statement didn't.
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
+    bool Update(ScreenState *pState)
+    {
+        MSG msg = {};
         while (true)
         {
-            MSG msg = {};
             if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 TranslateMessage(&msg);
@@ -147,15 +157,16 @@ public:
             }
             else
             {
-                return true;
-            }
-
-            if (msg.message == WM_QUIT)
-            {
-                *pOut = (int)msg.wParam;
-                return false;
+                break;
             }
         }
+
+        if (msg.message == WM_QUIT)
+        {
+            return false;
+        }
+        *pState = m_state;
+        return true;
     }
 };
 
@@ -164,27 +175,23 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     CommandLine cmd;
     cmd.Parse();
 
-    D3D12HelloConstBuffers sample;
-
     Window window;
     auto hwnd = window.Create(CLASS_NAME.c_str(), WINDOW_TITLE.c_str(),
-                              WIDTH, HEIGHT, WindowProc, &sample);
+                              WIDTH, HEIGHT);
     if (!hwnd)
     {
         return 1;
     }
+        window.Show();
 
-    // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
-    sample.OnInit(hwnd, cmd.m_useWarpDevice);
-
-    window.Show();
-
-    // Main sample loop.
-    int retcode;
-    while (window.Loop(&retcode))
     {
-    }
+        D3D12HelloConstBuffers renderer(cmd.m_useWarpDevice);
+        ScreenState state;
+        while (window.Update(&state))
+        {
+            renderer.OnFrame(hwnd, state);
+        }
 
-    // Return this part of the WM_QUIT message to Windows.
-    return retcode;
+        return 0;
+    }
 }
