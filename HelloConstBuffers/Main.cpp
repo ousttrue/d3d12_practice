@@ -1,5 +1,6 @@
 #include "D3D12HelloConstBuffers.h"
 #include "ScreenState.h"
+#include <windowsx.h>
 
 int WIDTH = 1280;
 int HEIGHT = 720;
@@ -55,7 +56,7 @@ struct Gwlp
 class Window
 {
     HWND m_hwnd = NULL;
-    ScreenState m_state;
+    ScreenState m_state{};
 
 public:
     HWND Create(const wchar_t *className, const wchar_t *titleName,
@@ -139,6 +140,73 @@ public:
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
+
+        case WM_MOUSEMOVE:
+            window->m_state.X = GET_X_LPARAM(lParam);
+            window->m_state.Y = GET_Y_LPARAM(lParam);
+            return 0;
+
+        case WM_LBUTTONDOWN:
+            if (!window->m_state.HasCapture())
+            {
+                SetCapture(hWnd);
+            }
+            window->m_state.Set(MouseButtonFlags::LeftDown);
+            return 0;
+
+        case WM_LBUTTONUP:
+            window->m_state.Unset(MouseButtonFlags::LeftDown);
+            if (!window->m_state.HasCapture())
+            {
+                ReleaseCapture();
+            }
+            return 0;
+
+        case WM_RBUTTONDOWN:
+            if (!window->m_state.HasCapture())
+            {
+                SetCapture(hWnd);
+            }
+            window->m_state.Set(MouseButtonFlags::RightDown);
+            return 0;
+
+        case WM_RBUTTONUP:
+            window->m_state.Unset(MouseButtonFlags::RightDown);
+            if (!window->m_state.HasCapture())
+            {
+                ReleaseCapture();
+            }
+            return 0;
+
+        case WM_MBUTTONDOWN:
+            if (!window->m_state.HasCapture())
+            {
+                SetCapture(hWnd);
+            }
+            window->m_state.Set(MouseButtonFlags::MiddleDown);
+            return 0;
+
+        case WM_MBUTTONUP:
+            window->m_state.Unset(MouseButtonFlags::MiddleDown);
+            if (!window->m_state.HasCapture())
+            {
+                ReleaseCapture();
+            }
+            return 0;
+
+        case WM_MOUSEWHEEL:
+        {
+            auto zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+            if (zDelta < 0)
+            {
+                window->m_state.Set(MouseButtonFlags::WheelMinus);
+            }
+            else if (zDelta > 0)
+            {
+                window->m_state.Set(MouseButtonFlags::WheelPlus);
+            }
+            return 0;
+        }
         }
 
         // Handle any messages the switch statement didn't.
@@ -165,7 +233,9 @@ public:
         {
             return false;
         }
+        m_state.Time = timeGetTime();
         *pState = m_state;
+        m_state.ClearWheel();
         return true;
     }
 };
@@ -182,7 +252,7 @@ _Use_decl_annotations_ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR,
     {
         return 1;
     }
-        window.Show();
+    window.Show();
 
     {
         D3D12HelloConstBuffers renderer(cmd.m_useWarpDevice);

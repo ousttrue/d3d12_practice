@@ -12,9 +12,6 @@ class CD3D12SwapChain
     template <class T>
     using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    // Viewport dimensions.
-    float m_aspectRatio = 1.0f;
-
     ComPtr<IDXGISwapChain3> m_swapChain;
     UINT m_frameIndex = 0;
     CD3DX12_VIEWPORT m_viewport;
@@ -25,8 +22,6 @@ class CD3D12SwapChain
 
 public:
     CD3D12SwapChain();
-    float AspectRatio() const { return m_aspectRatio; }
-
     void Create(
         const ComPtr<IDXGIFactory4> &factory,
         const ComPtr<ID3D12CommandQueue> &commandQueue, HWND hwnd, int width, int height);

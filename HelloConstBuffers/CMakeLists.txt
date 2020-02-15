@@ -24,6 +24,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     d3d12
     dxgi
     d3dcompiler
+    winmm
     )
 
 set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 20)

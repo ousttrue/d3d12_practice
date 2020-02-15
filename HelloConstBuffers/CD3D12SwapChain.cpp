@@ -34,7 +34,6 @@ void CD3D12SwapChain::Create(
     m_swapChain->GetDesc1(&swapChainDesc);
     width = swapChainDesc.Width;
     height = swapChainDesc.Height;
-    m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height));
     m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(width), static_cast<LONG>(height));
 }

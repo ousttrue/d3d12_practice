@@ -36,8 +36,6 @@ UINT INDICES[] =
 const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
 const UINT INDEX_STRIDE = sizeof(INDICES[0]);
 
-
-
 class Impl
 {
     // Pipeline objects.
@@ -136,17 +134,14 @@ public:
     {
         if (m_lastState.Width != state.Width || m_lastState.Height != state.Height)
         {
-            OnSize(hWnd, state.Width, state.Height);
+            // recreate swapchain
+            m_queue->SyncFence();
+            m_rt->Resize(m_queue->CommandQueue(),
+                         hWnd, state.Width, state.Height);
         }
+        m_camera->OnFrame(state, m_lastState);
         m_lastState = state;
         OnRender();
-    }
-
-    void OnSize(HWND hwnd, UINT width, UINT height)
-    {
-        m_queue->SyncFence();
-        m_rt->Resize(m_queue->CommandQueue(), hwnd, width, height);
-        m_camera->UpdateProjection(m_rt->AspectRatio());
     }
 
     // Render the scene.
