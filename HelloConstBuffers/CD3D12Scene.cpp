@@ -1,6 +1,7 @@
 #include "CD3D12Scene.h"
 #include "CD3D12SwapChain.h"
 #include "d3dhelper.h"
+#include "ResourceItem.h"
 #include <string>
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -143,30 +144,20 @@ ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &d
     // Create the vertex buffer.
     if (isDynamic)
     {
-        ThrowIfFailed(device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(vertexBytes),
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_vertexBuffer)));
-
-        // Copy the triangle data to the vertex buffer.
-        UINT8 *pVertexDataBegin;
-        CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU.
-        ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
-        memcpy(pVertexDataBegin, vertices, vertexBytes);
-        m_vertexBuffer->Unmap(0, nullptr);
+        m_vertexBuffer = ResourceItem::CreateUpload(device, vertexBytes);
+        if (!m_vertexBuffer)
+        {
+            throw;
+        }
+        m_vertexBuffer->MapCopyUnmap(vertices, vertexBytes);
     }
     else
     {
-        ThrowIfFailed(device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(vertexBytes),
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            IID_PPV_ARGS(&m_vertexBuffer)));
+        m_vertexBuffer = ResourceItem::CreateDefault(device, vertexBytes);
+        if (!m_vertexBuffer)
+        {
+            throw;
+        }
 
         ThrowIfFailed(device->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -203,13 +194,10 @@ ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &d
                 .RowPitch = vertexBytes,
                 .SlicePitch = vertexStride,
             };
-            UpdateSubresources<1>(m_commandList.Get(), m_vertexBuffer.Get(), m_upload.Get(), 0, 0, 1, &vertexData);
-            m_commandList->ResourceBarrier(
-                1,
-                &CD3DX12_RESOURCE_BARRIER::Transition(
-                    m_vertexBuffer.Get(),
-                    D3D12_RESOURCE_STATE_COPY_DEST,
-                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+            UpdateSubresources<1>(m_commandList.Get(), m_vertexBuffer->Resource().Get(), m_upload.Get(), 0, 0, 1, &vertexData);
+
+            auto callback = m_vertexBuffer->EnqueueTransition(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            callback();
         }
         {
             D3D12_SUBRESOURCE_DATA vertexData = {
@@ -224,12 +212,12 @@ ComPtr<ID3D12CommandList> CD3D12Scene::SetVertices(const ComPtr<ID3D12Device> &d
                     m_indexBuffer.Get(),
                     D3D12_RESOURCE_STATE_COPY_DEST,
                     D3D12_RESOURCE_STATE_INDEX_BUFFER));
-         }
+        }
         m_commandList->Close();
     }
 
     m_vertexBufferView = D3D12_VERTEX_BUFFER_VIEW{
-        .BufferLocation = m_vertexBuffer->GetGPUVirtualAddress(),
+        .BufferLocation = m_vertexBuffer->Resource()->GetGPUVirtualAddress(),
         .SizeInBytes = vertexBytes,
         .StrideInBytes = vertexStride,
     };

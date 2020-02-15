@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <DirectXMath.h>
+#include <memory>
 
 class CD3D12Scene
 {
@@ -14,7 +15,7 @@ class CD3D12Scene
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     // App resources.
-    ComPtr<ID3D12Resource> m_vertexBuffer;
+    std::shared_ptr<class ResourceItem> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
     ComPtr<ID3D12Resource> m_indexBuffer;
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};

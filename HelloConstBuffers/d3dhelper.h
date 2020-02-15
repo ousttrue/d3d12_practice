@@ -1,5 +1,6 @@
 #pragma once
 #include <stdexcept>
+#include <dxgi1_4.h>
 
 template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
