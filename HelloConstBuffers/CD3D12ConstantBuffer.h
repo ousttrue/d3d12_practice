@@ -14,12 +14,13 @@ public:
     T Data{};
 
     void Initialize(const Microsoft::WRL::ComPtr<ID3D12Device> &device,
-                    const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> &cbvHeap)
+                    const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> &cbvHeap, int cbvSlot)
     {
+        auto size=((UINT)sizeof(T) + 255) & ~255; // CB size is required to be 256-byte aligned.
         ThrowIfFailed(device->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
             D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
+            &CD3DX12_RESOURCE_DESC::Buffer(size),
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
             IID_PPV_ARGS(&m_resource)));
@@ -27,9 +28,12 @@ public:
         // Describe and create a constant buffer view.
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {
             .BufferLocation = m_resource->GetGPUVirtualAddress(),
-            .SizeInBytes = (sizeof(T) + 255) & ~255, // CB size is required to be 256-byte aligned.
+            .SizeInBytes = size,
         };
-        device->CreateConstantBufferView(&cbvDesc, cbvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        auto descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE handle(cbvHeap->GetCPUDescriptorHandleForHeapStart(), cbvSlot, descriptorSize);
+        device->CreateConstantBufferView(&cbvDesc, handle);
 
         // Map and initialize the constant buffer. We don't unmap this until the
         // app closes. Keeping things mapped for the lifetime of the resource is okay.

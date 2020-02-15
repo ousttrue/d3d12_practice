@@ -116,7 +116,7 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
     }
 
     // Create the constant buffer.
-    m_constantBuffer.Initialize(device, m_cbvHeap);
+    m_constantBuffer.Initialize(device, m_cbvHeap, 0);
 
     return true;
 }
