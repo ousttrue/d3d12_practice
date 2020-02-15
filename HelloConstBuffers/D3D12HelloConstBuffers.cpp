@@ -10,6 +10,7 @@
 #include "CommandList.h"
 #include "Uploader.h"
 #include "ResourceItem.h"
+#include "CD3D12CommandQueue.h"
 #include <list>
 #include <functional>
 
@@ -36,32 +37,27 @@ class Impl
 {
     // Pipeline objects.
     ComPtr<ID3D12Device> m_device;
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
-    // Synchronization objects.
-    HANDLE m_fenceEvent;
-    ComPtr<ID3D12Fence> m_fence;
-    UINT64 m_fenceValue;
 
     CD3D12SwapChain *m_rt = nullptr;
     CD3D12Scene *m_scene = nullptr;
     Uploader *m_uploader = nullptr;
+    CD3D12CommandQueue *m_queue = nullptr;
 
 public:
     Impl()
-        : m_rt(new CD3D12SwapChain), m_scene(new CD3D12Scene), m_uploader(new Uploader)
+        : m_rt(new CD3D12SwapChain),
+          m_scene(new CD3D12Scene),
+          m_uploader(new Uploader),
+          m_queue(new CD3D12CommandQueue)
     {
     }
 
     ~Impl()
     {
-        // Ensure that the GPU is no longer referencing resources that are about to be
-        // cleaned up by the destructor.
-        SyncFence();
-
+        delete m_queue;
         delete m_uploader;
         delete m_scene;
         delete m_rt;
-        CloseHandle(m_fenceEvent);
     }
 
     void OnInit(HWND hwnd, bool useWarpDevice)
@@ -69,39 +65,6 @@ public:
         ComPtr<IDXGIFactory4> factory;
         ThrowIfFailed(CreateDXGIFactory2(GetDxgiFactoryFlags(), IID_PPV_ARGS(&factory)));
 
-        LoadPipeline(factory, useWarpDevice);
-        m_rt->Initialize(factory, m_commandQueue, hwnd);
-        m_scene->Initialize(m_device);
-
-        // Create the vertex buffer.
-        auto upload = false;
-        std::shared_ptr<ResourceItem> vertexBuffer;
-        if (upload)
-        {
-            vertexBuffer = ResourceItem::CreateUpload(m_device, VERTICES_BYTE_SIZE);
-            vertexBuffer->MapCopyUnmap(VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
-        }
-        else
-        {
-            vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
-        }
-        m_scene->VertexBuffer(vertexBuffer);
-
-        m_uploader->Initialize(m_device);
-        m_uploader->EnqueueUpload({m_scene->VertexBuffer(), VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
-    }
-
-    void OnSize(HWND hwnd, UINT width, UINT height)
-    {
-        SyncFence();
-        m_rt->Resize(m_commandQueue, hwnd, width, height);
-        auto aspectRatio = m_rt->AspectRatio();
-        m_scene->UpdateProjection(aspectRatio);
-    }
-
-    // Load the rendering pipeline dependencies.
-    void LoadPipeline(const ComPtr<IDXGIFactory4> &factory, bool useWarpDevice)
-    {
         if (useWarpDevice)
         {
             ComPtr<IDXGIAdapter> warpAdapter;
@@ -120,29 +83,33 @@ public:
                 IID_PPV_ARGS(&m_device)));
         }
 
-        // Describe and create the command queue.
-        D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-        queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-        queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+        m_queue->Initialize(m_device);
+        m_rt->Initialize(factory, m_queue->CommandQueue(), hwnd);
+        m_scene->Initialize(m_device);
+        m_uploader->Initialize(m_device);
 
-        // Create synchronization objects and wait until assets have been uploaded to the GPU.
+        // Create the vertex buffer.
+        auto isDynamic = false;
+        if (isDynamic)
         {
-            ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-            m_fenceValue = 1;
-
-            // Create an event handle to use for frame synchronization.
-            m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-            if (m_fenceEvent == nullptr)
-            {
-                ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-            }
-
-            // Wait for the command list to execute; we are reusing the same command
-            // list in our main loop but for now, we just want to wait for setup to
-            // complete before continuing.
-            SyncFence();
+            auto vertexBuffer = ResourceItem::CreateUpload(m_device, VERTICES_BYTE_SIZE);
+            vertexBuffer->MapCopyUnmap(VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE);
+            m_scene->VertexBuffer(vertexBuffer);
         }
+        else
+        {
+            auto vertexBuffer = ResourceItem::CreateDefault(m_device, VERTICES_BYTE_SIZE);
+            m_uploader->EnqueueUpload({m_scene->VertexBuffer(), VERTICES, VERTICES_BYTE_SIZE, VERTEX_STRIDE});
+            m_scene->VertexBuffer(vertexBuffer);
+        }
+    }
+
+    void OnSize(HWND hwnd, UINT width, UINT height)
+    {
+        m_queue->SyncFence();
+        m_rt->Resize(m_queue->CommandQueue(), hwnd, width, height);
+        auto aspectRatio = m_rt->AspectRatio();
+        m_scene->UpdateProjection(aspectRatio);
     }
 
     // Render the scene.
@@ -154,37 +121,9 @@ public:
         auto commandList = m_scene->Update(m_rt);
 
         auto callbacks = commandList->Close();
-        ID3D12CommandList *list[] = {
-            commandList->Get()};
-        m_commandQueue->ExecuteCommandLists(_countof(list), list);
+        m_queue->Execute(commandList->Get());
         m_rt->Present();
-        SyncFence(callbacks);
-    }
-
-    using CallbackList = std::list<std::function<void()>>;
-    void SyncFence(const CallbackList &callbacks = CallbackList())
-    {
-        // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-        // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-        // sample illustrates how to use fences for efficient resource usage and to
-        // maximize GPU utilization.
-
-        // Signal and increment the fence value.
-        const UINT64 fence = m_fenceValue;
-        ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
-        m_fenceValue++;
-
-        // Wait until the previous frame is finished.
-        if (m_fence->GetCompletedValue() < fence)
-        {
-            ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
-            WaitForSingleObject(m_fenceEvent, INFINITE);
-        }
-
-        for (auto &callback : callbacks)
-        {
-            callback();
-        }
+        m_queue->SyncFence(callbacks);
     }
 };
 

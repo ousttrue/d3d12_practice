@@ -4,6 +4,7 @@ add_executable(${TARGET_NAME} WIN32
     D3D12HelloConstBuffers.cpp
     CD3D12Scene.cpp
     CD3D12SwapChain.cpp
+    CD3D12CommandQueue.cpp
     ResourceItem.cpp
     CommandList.cpp
     Uploader.cpp
