@@ -7,6 +7,20 @@
 
 static const UINT BACKBUFFER_COUNT = 2;
 
+struct RenderTarget
+{
+    Microsoft::WRL::ComPtr<ID3D12Resource> Buffer;
+    D3D12_CPU_DESCRIPTOR_HANDLE RTV;
+    Microsoft::WRL::ComPtr<ID3D12Resource> DepthStencil;
+    D3D12_CPU_DESCRIPTOR_HANDLE DSV;
+
+    void Release()
+    {
+        Buffer.Reset();
+        DepthStencil.Reset();
+    }
+};
+
 class CD3D12SwapChain
 {
     template <class T>
@@ -16,9 +30,10 @@ class CD3D12SwapChain
     UINT m_frameIndex = 0;
     CD3DX12_VIEWPORT m_viewport;
     CD3DX12_RECT m_scissorRect;
-    ComPtr<ID3D12Resource> m_renderTargets[BACKBUFFER_COUNT];
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    UINT m_rtvDescriptorSize = 0;
+    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
+
+    RenderTarget m_renderTargets[BACKBUFFER_COUNT];
 
 public:
     CD3D12SwapChain();

@@ -117,14 +117,17 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
                 .ForcedSampleCount = 0,
                 .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF,
             },
+            .DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT),
             .InputLayout = {inputElementDescs, _countof(inputElementDescs)},
             .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
             .NumRenderTargets = 1,
             .RTVFormats = {DXGI_FORMAT_R8G8B8A8_UNORM},
+            .DSVFormat = DXGI_FORMAT_D32_FLOAT,
             .SampleDesc{
                 .Count = 1,
             },
         };
+
         ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
 
