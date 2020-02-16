@@ -97,21 +97,34 @@ bool CD3D12Scene::Initialize(const ComPtr<ID3D12Device> &device)
                 {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
         // Describe and create the graphics pipeline state object (PSO).
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = {inputElementDescs, _countof(inputElementDescs)};
-        psoDesc.pRootSignature = m_rootSignature.Get();
-        psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-        psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-        psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-        psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-        psoDesc.DepthStencilState.DepthEnable = FALSE;
-        psoDesc.DepthStencilState.StencilEnable = FALSE;
-        psoDesc.SampleMask = UINT_MAX;
-        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        psoDesc.NumRenderTargets = 1;
-        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-        psoDesc.SampleDesc.Count = 1;
-
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
+            .pRootSignature = m_rootSignature.Get(),
+            .VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get()),
+            .PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get()),
+            .BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT),
+            .SampleMask = UINT_MAX,
+            .RasterizerState = {
+                .FillMode = D3D12_FILL_MODE_SOLID,
+                // .CullMode = D3D12_CULL_MODE_BACK,
+                .CullMode = D3D12_CULL_MODE_NONE,
+                .FrontCounterClockwise = FALSE,
+                .DepthBias = D3D12_DEFAULT_DEPTH_BIAS,
+                .DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP,
+                .SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS,
+                .DepthClipEnable = TRUE,
+                .MultisampleEnable = FALSE,
+                .AntialiasedLineEnable = FALSE,
+                .ForcedSampleCount = 0,
+                .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF,
+            },
+            .InputLayout = {inputElementDescs, _countof(inputElementDescs)},
+            .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+            .NumRenderTargets = 1,
+            .RTVFormats = {DXGI_FORMAT_R8G8B8A8_UNORM},
+            .SampleDesc{
+                .Count = 1,
+            },
+        };
         ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
 
