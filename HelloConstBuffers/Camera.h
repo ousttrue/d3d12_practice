@@ -10,11 +10,11 @@ class Camera
     // view
     float m_yaw = 0;
     float m_pitch = 0;
-    DirectX::XMFLOAT3 m_translation = {0, 0, 5};
+    DirectX::XMFLOAT3 m_translation = {0, 0, 7};
 
     // projection
     float m_near = 0.1f;
-    float m_far = 10.0f;
+    float m_far = 100.0f;
     float m_fovY = 30.0f / 180.0f * DirectX::XM_PI;
     float m_aspectRatio = 1.0f;
 

@@ -24,16 +24,30 @@ struct Vertex
 };
 // Define the geometry for a triangle.
 Vertex VERTICES[] = {
-    {{-1, 1, 0}, {0, 0}},  // 0
-    {{1, 1, 0}, {1, 0}},   // 1
-    {{1, -1, 0}, {1, 1}},  // 2
-    {{-1, -1, 0}, {0, 1}}, // 3
+    {{-1, 1, -1}, {0, 0}},  // 0
+    {{1, 1, -1}, {1, 0}},   // 1
+    {{1, -1, -1}, {1, 1}},  // 2
+    {{-1, -1, -1}, {0, 1}}, // 3
+    {{-1, 1, 1}, {1, 0}},  // 4
+    {{1, 1, 1}, {0, 0}},   // 5
+    {{1, -1, 1}, {0, 1}},  // 6
+    {{-1, -1, 1}, {1, 1}}, // 7
 };
 const UINT VERTICES_BYTE_SIZE = sizeof(VERTICES);
 const UINT VERTEX_STRIDE = sizeof(VERTICES[0]);
 UINT INDICES[] = {
-    0, 1, 2, // 0
-    2, 3, 0, // 1
+    0, 1, 2, // z-
+    2, 3, 0, 
+    1, 5, 6, // x+
+    6, 2, 1,
+    5, 4, 7, // z+
+    7, 6, 5,
+    4, 0, 3, // x-
+    3, 7, 4,
+    4, 5, 1, // y+
+    1, 0, 4,
+    6, 7, 3, // y-
+    3, 2, 6,
 };
 const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
 const UINT INDEX_STRIDE = sizeof(INDICES[0]);
