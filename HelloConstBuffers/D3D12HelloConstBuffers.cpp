@@ -20,14 +20,14 @@
 struct Vertex
 {
     DirectX::XMFLOAT3 position;
-    DirectX::XMFLOAT4 color;
+    DirectX::XMFLOAT2 uv;
 };
 // Define the geometry for a triangle.
 Vertex VERTICES[] =
     {
-        {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-        {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-        {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+        {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f}},
+        {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f}},
+        {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f}}};
 const UINT VERTICES_BYTE_SIZE = sizeof(VERTICES);
 const UINT VERTEX_STRIDE = sizeof(VERTICES[0]);
 UINT INDICES[] =

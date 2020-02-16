@@ -10,34 +10,45 @@ class Window
 
 public:
     HWND Create(const wchar_t *className, const wchar_t *titleName,
-                int width, int height)
+                int width = 0, int height = 0)
     {
         auto hInstance = GetModuleHandle(NULL);
         // Initialize the window class.
-        WNDCLASSEX windowClass = {0};
-        windowClass.cbSize = sizeof(WNDCLASSEX);
-        windowClass.style = CS_HREDRAW | CS_VREDRAW;
-        windowClass.lpfnWndProc = WindowProc;
-        windowClass.hInstance = hInstance;
-        windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-        windowClass.lpszClassName = className;
-        if (!RegisterClassEx(&windowClass))
+        WNDCLASSEXW windowClass = {
+            .cbSize = (UINT)sizeof(WNDCLASSEXW),
+            .style = CS_HREDRAW | CS_VREDRAW,
+            .lpfnWndProc = WindowProc,
+            .hInstance = hInstance,
+            .hCursor = LoadCursor(NULL, IDC_ARROW),
+            .lpszClassName = className,
+        };
+        if (!RegisterClassExW(&windowClass))
         {
             return NULL;
         }
 
-        RECT windowRect = {0, 0, width, height};
-        AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+        if (width && height)
+        {
+            RECT windowRect = {0, 0, width, height};
+            AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+            width = windowRect.right - windowRect.left;
+            height = windowRect.bottom - windowRect.top;
+        }
+        else
+        {
+            width = CW_USEDEFAULT;
+            height = CW_USEDEFAULT;
+        }
 
         // Create the window and store a handle to it.
-        m_hwnd = CreateWindow(
+        m_hwnd = CreateWindowW(
             className,
             titleName,
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            windowRect.right - windowRect.left,
-            windowRect.bottom - windowRect.top,
+            width,
+            height,
             nullptr, // We have no parent window.
             nullptr, // We aren't using menus.
             hInstance,
@@ -46,7 +57,8 @@ public:
         return m_hwnd;
     }
 
-    void Show(int nCmdShow = SW_SHOW)
+    void
+    Show(int nCmdShow = SW_SHOW)
     {
         ShowWindow(m_hwnd, nCmdShow);
     }

@@ -3,7 +3,8 @@
         "*.uss": "css",
         "*.ipp": "cpp",
         "vector": "cpp",
-        "memory": "cpp"
+        "memory": "cpp",
+        "list": "cpp"
     },
     "cSpell.words": [
         "DCOMPILE",
