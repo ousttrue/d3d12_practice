@@ -41,6 +41,7 @@ class ResourceItem : public std::enable_shared_from_this<ResourceItem>
 
     UINT m_byteLength = 0;
     UINT m_stride = 0;
+    UINT m_count = 0;
 
     ResourceItem(const ComPtr<ID3D12Resource> &resource, D3D12_RESOURCE_STATES state);
     // avoid copy
@@ -48,9 +49,9 @@ class ResourceItem : public std::enable_shared_from_this<ResourceItem>
     ResourceItem &operator=(const ResourceItem &src) = delete;
 
 public:
-public:
     ItemState State() const { return m_state; }
     const ComPtr<ID3D12Resource> &Resource() const { return m_resource; }
+    UINT Count() const { return m_count; }
 
     D3D12_VERTEX_BUFFER_VIEW VertexBufferView() const
     {

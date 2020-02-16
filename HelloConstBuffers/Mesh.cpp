@@ -28,7 +28,7 @@ void Mesh::IndexedCommand(CommandList *commandList)
         _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         _commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
         _commandList->IASetIndexBuffer(&m_indexBuffer->IndexBufferView());
-        _commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+        _commandList->DrawIndexedInstanced(m_indexBuffer->Count(), 1, 0, 0, 0);
     }
 }
 
@@ -48,6 +48,6 @@ void Mesh::NonIndexedCommand(CommandList *commandList)
         auto _commandList = commandList->Get();
         _commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         _commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->VertexBufferView());
-        _commandList->DrawInstanced(3, 1, 0, 0);
+        _commandList->DrawInstanced(m_vertexBuffer->Count(), 1, 0, 0);
     }
 }

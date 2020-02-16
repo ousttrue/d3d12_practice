@@ -22,6 +22,7 @@ void ResourceItem::MapCopyUnmap(const void *p, UINT byteLength, UINT stride)
 
     m_byteLength = byteLength;
     m_stride = stride;
+    m_count = byteLength / stride;
     m_state.Upload = UploadStates::Uploaded;
 }
 
@@ -72,6 +73,7 @@ void ResourceItem::EnqueueUpload(CommandList *commandList,
 
     m_byteLength = byteLength;
     m_stride = stride;
+    m_count = byteLength / stride;
 }
 
 std::shared_ptr<ResourceItem> ResourceItem::CreateUpload(const ComPtr<ID3D12Device> &device, UINT byteLength)

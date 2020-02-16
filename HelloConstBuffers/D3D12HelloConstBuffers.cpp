@@ -23,16 +23,18 @@ struct Vertex
     DirectX::XMFLOAT2 uv;
 };
 // Define the geometry for a triangle.
-Vertex VERTICES[] =
-    {
-        {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f}},
-        {{0.25f, -0.25f, 0.0f}, {0.0f, 1.0f}},
-        {{-0.25f, -0.25f, 0.0f}, {0.0f, 0.0f}}};
+Vertex VERTICES[] = {
+    {{-1, 1, 0}, {0, 0}},  // 0
+    {{1, 1, 0}, {1, 0}},   // 1
+    {{1, -1, 0}, {1, 1}},  // 2
+    {{-1, -1, 0}, {0, 1}}, // 3
+};
 const UINT VERTICES_BYTE_SIZE = sizeof(VERTICES);
 const UINT VERTEX_STRIDE = sizeof(VERTICES[0]);
-UINT INDICES[] =
-    {
-        0, 1, 2};
+UINT INDICES[] = {
+    0, 1, 2, // 0
+    2, 3, 0, // 1
+};
 const UINT INDICES_BYTE_SIZE = sizeof(INDICES);
 const UINT INDEX_STRIDE = sizeof(INDICES[0]);
 
