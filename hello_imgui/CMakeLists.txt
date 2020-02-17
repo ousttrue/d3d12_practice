@@ -16,6 +16,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 target_link_libraries(${TARGET_NAME} PRIVATE
     d3d12
     dxgi
+    winmm
     )
 target_compile_definitions(${TARGET_NAME} PRIVATE
     DEBUG
