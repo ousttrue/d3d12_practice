@@ -3,6 +3,7 @@
 // FIXME: 64-bit only for now! (Because sizeof(ImTextureId) == sizeof(void*))
 
 #include "D3DRenderer.h"
+#include "Window.h"
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include <tchar.h>
@@ -32,58 +33,11 @@ static void ReportLiveObjects()
     }
 }
 
-struct Gwlp
-{
-    // last param of CreateWindow to GWLP
-    static void Set(HWND hWnd, LPARAM lParam)
-    {
-        auto pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-        SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
-    }
-
-    template <class T>
-    static T *Get(HWND hWnd)
-    {
-        return reinterpret_cast<T *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-    }
-};
-
+// ImGui_ImplDX12_InvalidateDeviceObjects();
+// ImGui_ImplDX12_CreateDeviceObjects();
+// if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
 // Win32 message handler
-extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    auto renderer = Gwlp::Get<D3DRenderer>(hWnd);
-
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
-
-    switch (msg)
-    {
-    case WM_CREATE:
-        Gwlp::Set(hWnd, lParam);
-        break;
-
-    case WM_SIZE:
-        if (wParam != SIZE_MINIMIZED)
-        {
-            ImGui_ImplDX12_InvalidateDeviceObjects();
-            renderer->OnSize(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
-            ImGui_ImplDX12_CreateDeviceObjects();
-        }
-        return 0;
-
-    case WM_SYSCOMMAND:
-        if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
-            return 0;
-        break;
-
-    case WM_DESTROY:
-        ::PostQuitMessage(0);
-        return 0;
-    }
-
-    return ::DefWindowProc(hWnd, msg, wParam, lParam);
-}
+// extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 class WindowImGui
 {
@@ -134,27 +88,6 @@ public:
         io.KeyMap[ImGuiKey_Z] = 'Z';
 
         return true;
-    }
-
-    void UpdateMousePos()
-    {
-        ImGuiIO &io = ImGui::GetIO();
-
-        // Set OS mouse position if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
-        if (io.WantSetMousePos)
-        {
-            POINT pos = {(int)io.MousePos.x, (int)io.MousePos.y};
-            ::ClientToScreen(g_hWnd, &pos);
-            ::SetCursorPos(pos.x, pos.y);
-        }
-
-        // Set mouse position
-        io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
-        POINT pos;
-        if (HWND active_window = ::GetForegroundWindow())
-            if (active_window == g_hWnd || ::IsChild(active_window, g_hWnd))
-                if (::GetCursorPos(&pos) && ::ScreenToClient(g_hWnd, &pos))
-                    io.MousePos = ImVec2((float)pos.x, (float)pos.y);
     }
 
     bool UpdateMouseCursor()
@@ -208,11 +141,37 @@ public:
         return true;
     }
 
-    void NewFrame()
+    void NewFrame(HWND hWnd, const ScreenState &state)
     {
         // ImGui_ImplWin32_NewFrame();
         ImGuiIO &io = ImGui::GetIO();
         IM_ASSERT(io.Fonts->IsBuilt() && "Font atlas not built! It is generally built by the renderer back-end. Missing call to renderer _NewFrame() function? e.g. ImGui_ImplOpenGL3_NewFrame().");
+
+        ////////////////////////////////////////////////////////////
+        io.MousePos = ImVec2(state.X, state.Y);
+        io.MouseDown[0] = state.Has(MouseButtonFlags::LeftDown);
+        io.MouseDown[1] = state.Has(MouseButtonFlags::RightDown);
+        io.MouseDown[2] = state.Has(MouseButtonFlags::MiddleDown);
+        if (state.Has(MouseButtonFlags::WheelPlus))
+        {
+            io.MouseWheel = 1;
+        }
+        else if (state.Has(MouseButtonFlags::WheelMinus))
+        {
+            io.MouseWheel = -1;
+        }
+        else
+        {
+            io.MouseWheel = 0;
+        }
+        if (state.Has(MouseButtonFlags::CurosrChange))
+        {
+            if (!UpdateMouseCursor())
+            {
+                SetCursor(LoadCursor(NULL, IDC_ARROW));
+            }
+        }
+        ////////////////////////////////////////////////////////////
 
         // Setup display size (every frame to accommodate for window resizing)
         RECT rect;
@@ -233,7 +192,15 @@ public:
         // io.KeysDown[], io.MousePos, io.MouseDown[], io.MouseWheel: filled by the WndProc handler below.
 
         // Update OS mouse position
-        UpdateMousePos();
+        // UpdateMousePos(state);
+        // Set OS mouse position if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
+        if (io.WantSetMousePos)
+        {
+            POINT pos = {(int)io.MousePos.x, (int)io.MousePos.y};
+            ::ClientToScreen(g_hWnd, &pos);
+            ::SetCursorPos(pos.x, pos.y);
+        }
+
 
         // Update OS mouse cursor with the cursor requested by imgui
         ImGuiMouseCursor mouse_cursor = io.MouseDrawCursor ? ImGuiMouseCursor_None : ImGui::GetMouseCursor();
@@ -246,22 +213,119 @@ public:
         // Update game controllers (if enabled and available)
         // ImGui_ImplWin32_UpdateGamepads();
     }
+
+    LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    {
+        if (ImGui::GetCurrentContext() == NULL)
+            return 0;
+
+        ImGuiIO &io = ImGui::GetIO();
+        switch (msg)
+        {
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONDBLCLK:
+        case WM_RBUTTONDOWN:
+        case WM_RBUTTONDBLCLK:
+        case WM_MBUTTONDOWN:
+        case WM_MBUTTONDBLCLK:
+        case WM_XBUTTONDOWN:
+        case WM_XBUTTONDBLCLK:
+        {
+            int button = 0;
+            if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONDBLCLK)
+            {
+                button = 0;
+            }
+            if (msg == WM_RBUTTONDOWN || msg == WM_RBUTTONDBLCLK)
+            {
+                button = 1;
+            }
+            if (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONDBLCLK)
+            {
+                button = 2;
+            }
+            if (msg == WM_XBUTTONDOWN || msg == WM_XBUTTONDBLCLK)
+            {
+                button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? 3 : 4;
+            }
+            if (!ImGui::IsAnyMouseDown() && ::GetCapture() == NULL)
+                ::SetCapture(hwnd);
+            io.MouseDown[button] = true;
+            return 0;
+        }
+        case WM_LBUTTONUP:
+        case WM_RBUTTONUP:
+        case WM_MBUTTONUP:
+        case WM_XBUTTONUP:
+        {
+            int button = 0;
+            if (msg == WM_LBUTTONUP)
+            {
+                button = 0;
+            }
+            if (msg == WM_RBUTTONUP)
+            {
+                button = 1;
+            }
+            if (msg == WM_MBUTTONUP)
+            {
+                button = 2;
+            }
+            if (msg == WM_XBUTTONUP)
+            {
+                button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? 3 : 4;
+            }
+            io.MouseDown[button] = false;
+            if (!ImGui::IsAnyMouseDown() && ::GetCapture() == hwnd)
+                ::ReleaseCapture();
+            return 0;
+        }
+        case WM_MOUSEWHEEL:
+            io.MouseWheel += (float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA;
+            return 0;
+        case WM_MOUSEHWHEEL:
+            io.MouseWheelH += (float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA;
+            return 0;
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+            if (wParam < 256)
+                io.KeysDown[wParam] = 1;
+            return 0;
+        case WM_KEYUP:
+        case WM_SYSKEYUP:
+            if (wParam < 256)
+                io.KeysDown[wParam] = 0;
+            return 0;
+        case WM_CHAR:
+            // You can also use ToAscii()+GetKeyboardState() to retrieve characters.
+            io.AddInputCharacter((unsigned int)wParam);
+            return 0;
+        case WM_SETCURSOR:
+            if (LOWORD(lParam) == HTCLIENT && UpdateMouseCursor())
+                return 1;
+            return 0;
+            // case WM_DEVICECHANGE:
+            //     if ((UINT)wParam == DBT_DEVNODES_CHANGED)
+            //         g_WantUpdateHasGamepad = true;
+            //     return 0;
+        }
+        return 0;
+    }
 };
 
 int run()
 {
+    Window window(L"ImGui Example");
+    auto hwnd = window.Create(L"Dear ImGui DirectX12 Example", 1280, 800);
+    if (!hwnd)
+    {
+        return 1;
+    }
+
     D3DRenderer renderer(NUM_BACK_BUFFERS);
-
-    // Create application window
-    WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("ImGui Example"), NULL};
-    ::RegisterClassEx(&wc);
-    HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("Dear ImGui DirectX12 Example"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, &renderer);
-
-    // Initialize Direct3D
     if (!renderer.CreateDeviceD3D(hwnd))
     {
-        ::UnregisterClass(wc.lpszClassName, wc.hInstance);
-        return 1;
+        return 2;
     }
 
     // Show the window
@@ -309,25 +373,12 @@ int run()
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
-    MSG msg;
-    ZeroMemory(&msg, sizeof(msg));
-    while (msg.message != WM_QUIT)
+    ScreenState state;
+    while (window.Update(&state))
     {
-        // Poll and handle messages (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-        if (::PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE))
-        {
-            ::TranslateMessage(&msg);
-            ::DispatchMessage(&msg);
-            continue;
-        }
-
         // Start the Dear ImGui frame
         ImGui_ImplDX12_NewFrame();
-        imgui.NewFrame();
+        imgui.NewFrame(hwnd, state);
         ImGui::NewFrame();
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
@@ -381,7 +432,6 @@ int run()
     ImGui::DestroyContext();
 
     ::DestroyWindow(hwnd);
-    ::UnregisterClass(wc.lpszClassName, wc.hInstance);
 
     return 0;
 }

@@ -13,8 +13,9 @@ class Window
 
 public:
     Window(const wchar_t *className)
-    : m_className(className), m_hInstance(GetModuleHandle(NULL))
-    {}
+        : m_className(className), m_hInstance(GetModuleHandle(NULL))
+    {
+    }
 
     ~Window()
     {
@@ -195,6 +196,20 @@ public:
             }
             return 0;
         }
+
+        case WM_SYSCOMMAND:
+            if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
+                return 0;
+            break;
+
+        case WM_SETCURSOR:
+            if (LOWORD(lParam) == HTCLIENT)
+            {
+                // && ImGui_ImplWin32_UpdateMouseCursor();
+                window->m_state.Set(MouseButtonFlags::CurosrChange);
+                return 1;
+            }
+            break;
         }
 
         // Handle any messages the switch statement didn't.
@@ -227,7 +242,7 @@ public:
         }
         m_state.Time = timeGetTime();
         *pState = m_state;
-        m_state.ClearWheel();
+        m_state.Clear();
         return true;
     }
 };
