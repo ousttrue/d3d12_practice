@@ -164,7 +164,7 @@ public:
         {
             io.MouseWheel = 0;
         }
-        if (state.Has(MouseButtonFlags::CurosrChange))
+        if (state.Has(MouseButtonFlags::CursorUpdate))
         {
             if (!UpdateMouseCursor())
             {

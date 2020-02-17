@@ -205,8 +205,7 @@ public:
         case WM_SETCURSOR:
             if (LOWORD(lParam) == HTCLIENT)
             {
-                // && ImGui_ImplWin32_UpdateMouseCursor();
-                window->m_state.Set(MouseButtonFlags::CurosrChange);
+                window->m_state.Set(MouseButtonFlags::CursorUpdate);
                 return 1;
             }
             break;

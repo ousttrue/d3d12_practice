@@ -9,7 +9,7 @@ enum MouseButtonFlags
     MiddleDown = 0x04,
     WheelPlus = 0x08,
     WheelMinus = 0x10,
-    CurosrChange = 0x20,
+    CursorUpdate = 0x20,
 };
 
 struct ScreenState
@@ -38,7 +38,7 @@ struct ScreenState
 
     void Clear()
     {
-        Unset((MouseButtonFlags)(MouseButtonFlags::WheelMinus | MouseButtonFlags::WheelPlus | MouseButtonFlags::CurosrChange));
+        Unset((MouseButtonFlags)(MouseButtonFlags::WheelMinus | MouseButtonFlags::WheelPlus | MouseButtonFlags::CursorUpdate));
     }
 
     float AspectRatio() const
